@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+  <!-- Ball -->
+  <circle cx="34" cy="14" r="7" />
+  <!-- Bat: handle + blade outline -->
+  <path d="M8 10 L8 38 L10 40 L12 38 L12 10 L20 4 L22 6 L14 12 L14 36 L12 38" />
+  <path d="M20 4 L26 2 L28 4 L16 10" />
+</svg>

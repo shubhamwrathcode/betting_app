@@ -214,6 +214,10 @@ export const ImageAssets = {
   gamepad: require('../../assets/AppImages/gamepad-fill.png'),
   homeline: require('../../assets/AppImages/home-line.png'),
   menuLine: require('../../assets/AppImages/menu-line.png'),
+  honorofkingsfill: require('../../assets/AppImages/honor-of-kings-fill.png'),
+
+
+
 
 
 

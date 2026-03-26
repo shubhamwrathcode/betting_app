@@ -23,7 +23,15 @@ import { API_BASE_URL, apiClient } from '../../api/client'
 import { API_ENDPOINTS } from '../../api/endpoints'
 import { gameService } from '../../services/gameService'
 
-type ProviderCategory = { code?: string; name?: string; thumb?: string }
+type ProviderCategory = {
+  code?: string
+  name?: string
+  thumb?: string
+  thumbnail?: string
+  image?: string
+  icon?: string
+  logo?: string
+}
 type Provider = { code?: string; name?: string; totalGames?: number; categories?: ProviderCategory[] }
 type CasinoGame = {
   code?: string
@@ -55,6 +63,11 @@ const toAbsoluteImageUrl = (rawUrl: string) => {
   return `${API_BASE_URL}/${src}`
 }
 
+const getCategoryImage = (cat: ProviderCategory) => {
+  const raw = cat.thumb || cat.thumbnail || cat.image || cat.icon || cat.logo || ''
+  return typeof raw === 'string' ? raw.trim() : ''
+}
+
 const CasinoScreen = () => {
   const navigation = useNavigation<any>()
   const insets = useSafeAreaInsets()
@@ -65,6 +78,7 @@ const CasinoScreen = () => {
   const [bannerIndex, setBannerIndex] = useState(0)
   const [providers, setProviders] = useState<Provider[]>([])
   const [providersLoading, setProvidersLoading] = useState(true)
+  const [categoryThumbErrors, setCategoryThumbErrors] = useState<Set<string>>(new Set())
   const [providerModalOpen, setProviderModalOpen] = useState(false)
   const [providerSearch, setProviderSearch] = useState('')
   const [selectedProviderCode, setSelectedProviderCode] = useState('all')
@@ -104,7 +118,7 @@ const CasinoScreen = () => {
   }, [])
 
   const categoriesForProvider = useMemo(() => {
-    const lobby = [{ code: 'lobby', name: 'Lobby' }]
+    const lobby: ProviderCategory[] = [{ code: 'lobby', name: 'Lobby', thumb: '' }]
     if (selectedProviderCode === 'all') {
       const seen = new Set<string>(['lobby'])
       const all: ProviderCategory[] = [...lobby]
@@ -266,6 +280,15 @@ const CasinoScreen = () => {
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={[styles.content, { paddingBottom: 90 }]}
+        scrollEventThrottle={16}
+        onScroll={e => {
+          const { contentOffset, layoutMeasurement, contentSize } = e.nativeEvent
+          const distanceFromBottom =
+            contentSize.height - (contentOffset.y + layoutMeasurement.height)
+          if (distanceFromBottom < 220) {
+            handleLoadMore()
+          }
+        }}
       >
         <View style={styles.bannerWrap}>
           <FlatList
@@ -329,12 +352,36 @@ const CasinoScreen = () => {
         >
           {categoriesForProvider.map(cat => {
             const active = selectedCategoryCode === cat.code
+            const key = cat.code || cat.name || 'cat'
+            const thumb = getCategoryImage(cat)
+            const hasThumb = thumb.length > 0 && !categoryThumbErrors.has(key)
+            console.log(cat,'===image===')
             return (
               <Pressable
                 key={cat.code || 'cat'}
                 onPress={() => setSelectedCategoryCode(cat.code || 'lobby')}
                 style={[styles.categoryChip, active && styles.categoryChipActive]}
               >
+                {hasThumb ? (
+                  <Image
+                    source={{ uri: toAbsoluteImageUrl(thumb) }}
+                    style={styles.categoryThumb}
+                    resizeMode="contain"
+                    onError={() =>
+                      setCategoryThumbErrors(prev => {
+                        const next = new Set(prev)
+                        next.add(key)
+                        return next
+                      })
+                    }
+                  />
+                ) : (
+                  <Image
+                    source={cat.code === 'lobby' ? ImageAssets.gamepad : ImageAssets.honorofkingsfill}
+                    style={[styles.categoryFallbackIcon, active && styles.categoryFallbackIconActive]}
+                    resizeMode="contain"
+                  />
+                )}
                 <Text style={[styles.categoryText, active && styles.categoryTextActive]}>
                   {cat.name || cat.code}
                 </Text>
@@ -374,10 +421,6 @@ const CasinoScreen = () => {
           <View style={styles.footerLoading}>
             <ActivityIndicator color="#2E90FA" />
           </View>
-        ) : hasMoreGames && games.length > 0 ? (
-          <Pressable style={styles.loadMoreBtn} onPress={handleLoadMore}>
-            <Text style={styles.loadMoreText}>Load More</Text>
-          </Pressable>
         ) : null}
       </ScrollView>
 
@@ -468,9 +511,25 @@ const styles = StyleSheet.create({
     height: 38,
     borderRadius: 10,
     backgroundColor: '#29384F',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
     justifyContent: 'center',
   },
   categoryChipActive: { backgroundColor: '#E07B34' },
+  categoryThumb: {
+    width: 20,
+    height: 20,
+    borderRadius: 3,
+  },
+  categoryFallbackIcon: {
+    width: 16,
+    height: 16,
+    tintColor: '#AFC0D9',
+  },
+  categoryFallbackIconActive: {
+    tintColor: '#FFFFFF',
+  },
   categoryText: { color: '#E1E8F5', fontFamily: AppFonts.montserratSemiBold, fontSize: 12 },
   categoryTextActive: { color: '#FFFFFF' },
   sectionTitle: {
@@ -503,16 +562,6 @@ const styles = StyleSheet.create({
   emptyWrap: { paddingVertical: 40, alignItems: 'center', gap: 10 },
   emptyText: { color: '#AAB9CF', fontSize: 13, fontFamily: AppFonts.montserratRegular },
   footerLoading: { paddingVertical: 16 },
-  loadMoreBtn: {
-    marginTop: 8,
-    marginBottom: 8,
-    alignSelf: 'center',
-    backgroundColor: '#1D3F6A',
-    borderRadius: 10,
-    paddingHorizontal: 18,
-    paddingVertical: 10,
-  },
-  loadMoreText: { color: '#FFFFFF', fontFamily: AppFonts.montserratSemiBold, fontSize: 13 },
   modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'center', padding: 16 },
   modalCard: {
     backgroundColor: '#101A2E',

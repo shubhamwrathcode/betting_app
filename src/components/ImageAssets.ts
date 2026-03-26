@@ -216,6 +216,20 @@ export const ImageAssets = {
   menuLine: require('../../assets/AppImages/menu-line.png'),
   honorofkingsfill: require('../../assets/AppImages/honor-of-kings-fill.png'),
   bookopenfill: require('../../assets/AppImages/book-open-fill.png'),
+  bankfill: require('../../assets/AppImages/bank-fill.png'),
+  walletfill: require('../../assets/AppImages/wallet-3-fill.png'),
+  promotion: require('../../assets/AppImages/promotion.png'),
+  Referal: require('../../assets/AppImages/referal.png'),
+  transactionMenu: require('../../assets/AppImages/transactionMenu.png'),
+  flagBets: require('../../assets/AppImages/flagBets.png'),
+  bethistory: require('../../assets/AppImages/Bethistory.png'),
+  linechart: require('../../assets/AppImages/linechart.png'),
+  customerSupport: require('../../assets/AppImages/customerSupport.png'),
+
+
+
+
+
 
 
 

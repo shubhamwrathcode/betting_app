@@ -1,6 +1,8 @@
 import React from 'react'
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs'
 import { createStackNavigator, TransitionPresets } from '@react-navigation/stack'
+import { createDrawerNavigator } from '@react-navigation/drawer'
+import { DrawerActions } from '@react-navigation/native'
 import { LoginPage } from '../screens/auth/LoginPage'
 import { ForgotPasswordPage } from '../screens/auth/ForgotPasswordPage'
 import LandingPage from '../screens/auth/LandingPage'
@@ -9,8 +11,9 @@ import CasinoScreen from '../screens/home/CasinoScreen'
 import InPlayScreen from '../screens/home/InPlayScreen'
 import SportsbookScreen from '../screens/home/SportsbookScreen'
 import SearchScreen from '../screens/home/SearchScreen'
+import MenuScreen from '../screens/home/MenuScreen'
 import { BottomTab } from '../components/common/BottomTab'
-import { View, Text, StyleSheet, ActivityIndicator } from 'react-native'
+import { View, ActivityIndicator } from 'react-native'
 import { useAuth } from '../hooks/useAuth'
 
 type RootStackParamList = {
@@ -23,22 +26,27 @@ type RootStackParamList = {
 }
 
 const Tab = createBottomTabNavigator()
+const Drawer = createDrawerNavigator()
 const Stack = createStackNavigator<RootStackParamList>()
+const MenuTriggerScreen = () => <View style={{ flex: 1, backgroundColor: '#040f21' }} />
 
-const MenuScreen = () => (
-  <View style={styles.menuContainer}>
-    <Text style={styles.menuText}>Menu Screen Placeholder</Text>
-  </View>
-)
-
-const MainTabs = (props: any) => {
+const TabsNavigator = (props: any) => {
   return (
     <Tab.Navigator
       initialRouteName="Home"
       tabBar={tabBarProps => <BottomTab {...tabBarProps} />}
       screenOptions={{ headerShown: false }}
     >
-      <Tab.Screen name="Menu" component={MenuScreen} />
+      <Tab.Screen
+        name="Menu"
+        component={MenuTriggerScreen}
+        listeners={({ navigation }) => ({
+          tabPress: e => {
+            e.preventDefault()
+            navigation.dispatch(DrawerActions.openDrawer())
+          },
+        })}
+      />
       <Tab.Screen name="Casino" component={CasinoScreen} />
       <Tab.Screen
         name="Home"
@@ -55,6 +63,23 @@ const MainTabs = (props: any) => {
     </Tab.Navigator>
   )
 }
+
+const MainTabs = (props: any) => (
+  <Drawer.Navigator
+    screenOptions={{
+      headerShown: false,
+      drawerPosition: 'left',
+      drawerType: 'front',
+      overlayColor: 'transparent',
+      drawerStyle: { width: '100%', backgroundColor: 'transparent' },
+    }}
+    drawerContent={({ navigation }) => <MenuScreen navigation={navigation} />}
+  >
+    <Drawer.Screen name="Tabs">
+      {() => <TabsNavigator {...props} />}
+    </Drawer.Screen>
+  </Drawer.Navigator>
+)
 
 export const RootNavigator = () => {
   const { loading } = useAuth()
@@ -85,7 +110,3 @@ export const RootNavigator = () => {
   )
 }
 
-const styles = StyleSheet.create({
-  menuContainer: { flex: 1, backgroundColor: '#040f21', justifyContent: 'center', alignItems: 'center' },
-  menuText: { color: '#FFF', fontSize: 20 },
-})

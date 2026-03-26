@@ -20,6 +20,7 @@ type PrimaryButtonProps = {
   style?: ViewStyle
   textStyle?: TextStyle
   colors?: string[]
+  leftIcon?: React.ReactNode
 }
 
 export const PrimaryButton = ({
@@ -30,6 +31,7 @@ export const PrimaryButton = ({
   style,
   textStyle,
   colors = ['#F97316', '#D9480F'], // Gradient from light to dark orange
+  leftIcon,
 }: PrimaryButtonProps) => {
   return (
     <TouchableOpacity
@@ -47,7 +49,10 @@ export const PrimaryButton = ({
         {loading ? (
           <ActivityIndicator color="#FFF" size="small" />
         ) : (
-          <Text style={[styles.text, textStyle]}>{title}</Text>
+          <View style={styles.contentRow}>
+            {leftIcon}
+            <Text style={[styles.text, textStyle]}>{title}</Text>
+          </View>
         )}
       </LinearGradient>
       {/* 3D Bottom Shadow Effect */}
@@ -87,6 +92,11 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontFamily: AppFonts.montserratBold,
     textTransform: 'none',
+  },
+  contentRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   shadow: {
     ...StyleSheet.absoluteFillObject,

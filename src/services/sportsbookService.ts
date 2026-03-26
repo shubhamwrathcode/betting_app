@@ -50,12 +50,50 @@ const toMatches = (res: MatchesResponse): SportsbookMatch[] => {
 
 export const sportsbookService = {
   async getCricketMatches() {
-    return toMatches(await apiClient<MatchesResponse>(API_ENDPOINTS.sportsbookCricketMatches))
+    return toMatches(await apiClient<MatchesResponse>(API_ENDPOINTS.sportsbookCricketMatches, { skipAuth: true }))
   },
   async getTennisMatches() {
-    return toMatches(await apiClient<MatchesResponse>(API_ENDPOINTS.sportsbookTennisMatches))
+    return toMatches(await apiClient<MatchesResponse>(API_ENDPOINTS.sportsbookTennisMatches, { skipAuth: true }))
   },
   async getSoccerMatches() {
-    return toMatches(await apiClient<MatchesResponse>(API_ENDPOINTS.sportsbookSoccerMatches))
+    return toMatches(await apiClient<MatchesResponse>(API_ENDPOINTS.sportsbookSoccerMatches, { skipAuth: true }))
+  },
+  /** Returns raw API response — for normalizeRestMatchesList (website pattern) */
+  async getRawMatches(sport: string): Promise<any> {
+    const endpointMap: Record<string, string> = {
+      cricket: API_ENDPOINTS.sportsbookCricketMatches,
+      tennis: API_ENDPOINTS.sportsbookTennisMatches,
+      soccer: API_ENDPOINTS.sportsbookSoccerMatches,
+    }
+    const endpoint = endpointMap[sport]
+    if (!endpoint) return { data: [] }
+    try {
+      // Public endpoint used by web landing contract.
+      return await apiClient<any>(endpoint, { skipAuth: true })
+    } catch (publicErr) {
+      // Backend fallbacks: some deployments expose only protected generic list endpoints.
+      const sportAliases = sport === 'soccer' ? ['soccer', 'football'] : [sport]
+      const fallbackCandidates: string[] = []
+      for (const alias of sportAliases) {
+        const encoded = encodeURIComponent(alias)
+        fallbackCandidates.push(`/api/v1/sportsbook/matches?sport=${encoded}&fresh=1`)
+        fallbackCandidates.push(`/api/v1/sportsbook/matches?sport=${encoded}`)
+        fallbackCandidates.push(`/api/v1/sportsbook/matches?eventType=${encoded}&fresh=1`)
+        fallbackCandidates.push(`/api/v1/sportsbook/matches?eventType=${encoded}`)
+      }
+
+      for (const fallbackEndpoint of fallbackCandidates) {
+        try {
+          const res = await apiClient<any>(fallbackEndpoint, { skipAuth: false })
+          console.log(`[SportsbookService] Fallback success for "${sport}" via ${fallbackEndpoint}`)
+          return res
+        } catch {
+          // try next candidate
+        }
+      }
+
+      console.warn(`[SportsbookService] All fallbacks failed for "${sport}"`)
+      throw publicErr
+    }
   },
 }

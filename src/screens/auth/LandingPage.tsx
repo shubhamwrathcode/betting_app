@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ActivityIndicator,
   Animated,
@@ -18,8 +18,10 @@ import {
   Alert,
   TouchableOpacity,
 } from 'react-native'
+import AsyncStorage from '@react-native-async-storage/async-storage'
 
-if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+const isFabricRenderer = !!(globalThis as any)?.nativeFabricUIManager
+if (!isFabricRenderer && Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true)
 }
 import { useAuth } from '../../hooks/useAuth'
@@ -31,6 +33,18 @@ import { API_BASE_URL } from '../../api/client'
 import { LandingGame, landingService } from '../../services/landingService'
 import { gameService } from '../../services/gameService'
 import { SportsbookMatch, sportsbookService } from '../../services/sportsbookService'
+import {
+  connectSportsbookSocket,
+  subscribeMatchesMany,
+  unsubscribeMatchesMany,
+  addMatchesListener,
+  removeMatchesListener,
+} from '../../socket/sportsbookSocket'
+import {
+  normalizeRestMatchesList,
+  expandSocketBatchPayload,
+  getMatchRowsFromSocketPayload,
+} from '../../utils/sportsbookMatchesPayload'
 import { LandingHeader } from '../../components/common/LandingHeader'
 import { ImageAssets } from '../../components/ImageAssets'
 import { AppFonts } from '../../components/AppFonts'
@@ -147,6 +161,69 @@ const formatMatchTime = (input: unknown) => {
   return `${day}\n${time.toLowerCase()}`
 }
 
+/** Shared shape for home TOP matches (socket listSummary / legacy + REST) — ported from website */
+const pickMatchEventTime = (m: any): string | undefined => {
+  if (!m || typeof m !== 'object') return undefined
+  const candidates = [
+    m.eventTime, m.event_time, m.startTime, m.start_time,
+    m.openDate, m.open_date, m.eventOpenDate, m.event_open_date,
+    m.scheduledStart, m.scheduled_start, m.commenceTime, m.commence_time,
+    m.matchTime, m.match_time, m.kickOff, m.kick_off,
+  ]
+  for (const v of candidates) {
+    if (v == null || v === '') continue
+    if (typeof v === 'number' && Number.isFinite(v)) {
+      const ms = v < 1e12 ? v * 1000 : v
+      const d = new Date(ms)
+      if (!isNaN(d.getTime())) return d.toISOString()
+    }
+    if (typeof v === 'string') {
+      const d = new Date(v)
+      if (!isNaN(d.getTime())) return v
+    }
+  }
+  return undefined
+}
+
+const mapSocketRowsToTopMatches = (rows: any[], tournament: string): SportsbookMatch[] => {
+  return rows
+    .map((m: any) => {
+      const id = m.gameId ?? m.game_id ?? m.eventId ?? m.event_id
+      if (!id) return null
+      const et = m.eventTime ?? m.event_time ?? pickMatchEventTime(m)
+      return {
+        gameId: m.gameId ?? m.game_id ?? id,
+        game_id: m.game_id ?? m.gameId ?? id,
+        eventId: m.eventId ?? m.event_id ?? id,
+        event_id: m.event_id ?? m.eventId ?? id,
+        eventName: m.eventName ?? m.event_name ?? m.name ?? '—',
+        event_name: m.event_name ?? m.eventName ?? m.name ?? '—',
+        name: m.name ?? m.eventName ?? m.event_name ?? '—',
+        inPlay: m.inPlay ?? m.in_play ?? false,
+        in_play: m.in_play ?? m.inPlay ?? false,
+        eventTime: et,
+        event_time: et,
+        seriesName: m.seriesName ?? m.series_name ?? tournament,
+        series_name: m.series_name ?? m.seriesName ?? tournament,
+        openDate: m.openDate ?? m.open_date,
+        open_date: m.open_date ?? m.openDate,
+        selections: m.selections,
+      } as SportsbookMatch
+    })
+    .filter((m): m is SportsbookMatch => m !== null)
+    .sort((a, b) => ((b.inPlay || b.in_play) ? 1 : 0) - ((a.inPlay || a.in_play) ? 1 : 0))
+    .slice(0, 10)
+}
+
+const normalizeTopMatchSport = (sport: unknown): 'cricket' | 'tennis' | 'soccer' | null => {
+  const s = typeof sport === 'string' ? sport.toLowerCase().trim() : ''
+  if (!s) return null
+  if (s === 'cricket') return 'cricket'
+  if (s === 'tennis') return 'tennis'
+  if (s === 'soccer' || s === 'football') return 'soccer'
+  return null
+}
+
 const extractOdds = (match: SportsbookMatch) => {
   const selection = Array.isArray(match.selections) ? match.selections[0] : undefined
   const backs = Array.isArray(selection?.back) ? selection.back : []
@@ -210,7 +287,7 @@ export const LandingPage = ({ onOpenLogin, onOpenSignup, onOpenHome, navigation:
     try {
       const res = await gameService.launchGame(targetCode, game.providerCode || 'all')
       console.log(res, '==game launch response')
-      
+
       const d = res.data ?? (res as any).response?.data ?? (res as any).result ?? res
       const launchURL = d?.launchURL || d?.launchUrl || d?.url || d?.gameUrl || d?.gameURL || d?.iframeUrl || (typeof d === 'string' ? d : null)
 
@@ -239,7 +316,7 @@ export const LandingPage = ({ onOpenLogin, onOpenSignup, onOpenHome, navigation:
   const [gamesLoading, setGamesLoading] = useState(true)
   const [matchesLoading, setMatchesLoading] = useState(true)
   const [gamesError, setGamesError] = useState<string | null>(null)
-  const [matchesError, setMatchesError] = useState<string | null>(null)
+
   const [landingGames, setLandingGames] = useState<LandingGamesState>({
     liveCasino: [],
     slots: [],
@@ -333,33 +410,112 @@ export const LandingPage = ({ onOpenLogin, onOpenSignup, onOpenHome, navigation:
     return () => clearInterval(timer)
   }, [runHeroSlide])
 
+  // === Website-identical pattern: REST prefetch + Socket.IO live updates ===
+
+  // Max wait: after 10s, hide spinner regardless (same as website TOP_MATCH_LOAD_MAX_WAIT_MS)
+  const matchLoadTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   useEffect(() => {
-    let mounted = true
-    const loadMatches = async () => {
+    matchLoadTimerRef.current = setTimeout(() => {
+      setMatchesLoading(false)
+    }, 10000)
+    return () => {
+      if (matchLoadTimerRef.current) clearTimeout(matchLoadTimerRef.current)
+    }
+  }, [])
+
+  // 1) REST prefetch (fast first paint) – errors silently swallowed, socket will fill in
+  useEffect(() => {
+    let cancelled = false
+    const prefetchSport = async (
+      sport: string,
+      setRows: React.Dispatch<React.SetStateAction<SportsbookMatch[]>>,
+      tournament: string,
+    ) => {
       try {
-        const [cricket, tennis, soccer] = await Promise.all([
-          sportsbookService.getCricketMatches(),
-          sportsbookService.getTennisMatches(),
-          sportsbookService.getSoccerMatches(),
-        ])
-        if (!mounted) return
-        setCricketMatches(cricket.slice(0, 10))
-        setTennisMatches(tennis.slice(0, 10))
-        setFootballMatches(soccer.slice(0, 10))
-        setMatchesError(null)
-      } catch (error) {
-        if (!mounted) return
-        setCricketMatches([])
-        setTennisMatches([])
-        setFootballMatches([])
-        setMatchesError(error instanceof Error ? error.message : 'Failed to load matches')
-      } finally {
-        if (mounted) setMatchesLoading(false)
+        const res = await sportsbookService.getRawMatches(sport)
+        console.log(`[TopMatches][REST] ${sport} raw response:`, res)
+        if (cancelled) return
+        const raw = normalizeRestMatchesList(res)
+        console.log(`[TopMatches][REST] ${sport} normalized rows:`, raw.length)
+        if (!raw.length) return
+        const mapped = mapSocketRowsToTopMatches(raw, tournament)
+        console.log(`[TopMatches][REST] ${sport} mapped rows:`, mapped.length)
+        if (mapped.length > 0) {
+          setRows(mapped)
+          setMatchesLoading(false)
+        }
+      } catch (e) {
+        console.warn(`[TopMatches][REST] ${sport} prefetch failed`, e)
+        /* socket / max-wait timer still clears spinner – identical to website */
       }
     }
-    loadMatches()
+    prefetchSport('cricket', setCricketMatches, 'Cricket')
+    prefetchSport('tennis', setTennisMatches, 'Tennis')
+    prefetchSport('soccer', setFootballMatches, 'Football')
+    return () => { cancelled = true }
+  }, [])
+
+  // 2) Socket.IO live updates – subscribe to matches stream (same as website)
+  useEffect(() => {
+    let cancelled = false
+    const initSocket = async () => {
+      let token: string | null = null
+      try {
+        const stored = await AsyncStorage.getItem('user_auth')
+        if (stored) {
+          const parsed = JSON.parse(stored)
+          token = parsed?.token ?? parsed?.accessToken ?? null
+        }
+      } catch {}
+      if (!cancelled) connectSportsbookSocket(token)
+    }
+    initSocket()
+    subscribeMatchesMany(['cricket', 'tennis', 'soccer'])
+
+    const onMatches = (raw: any) => {
+      const items = expandSocketBatchPayload(raw)
+      console.log(`[Socket] Matches payload received: ${items.length} items`)
+      
+      for (const payload of items) {
+        const sport = normalizeTopMatchSport(payload?.sport)
+        if (!sport) {
+           console.log(`[Socket] Ignoring sport: ${sport}`)
+           continue
+        }
+
+        const { rows, error } = getMatchRowsFromSocketPayload(payload)
+        console.log(`[Socket] Sport: ${sport}, Rows: ${rows.length}, Error: ${error}`)
+
+        if (error) {
+          setMatchesLoading(false)
+          continue
+        }
+        if (rows.length === 0 && payload?.schema !== 'listSummary') {
+           console.log(`[Socket] Empty non-listSummary payload for ${sport}, skipping update`)
+           continue
+        }
+
+        const tournament =
+          sport === 'cricket' ? 'Cricket' : sport === 'tennis' ? 'Tennis' : 'Football'
+        const mapped = mapSocketRowsToTopMatches(rows, tournament)
+        
+        console.log(`[Socket] Updating UI for ${sport} with ${mapped.length} matches`)
+
+        if (sport === 'cricket') {
+          setCricketMatches(prev => (mapped.length > 0 ? mapped : prev))
+        } else if (sport === 'tennis') {
+          setTennisMatches(prev => (mapped.length > 0 ? mapped : prev))
+        } else {
+          setFootballMatches(prev => (mapped.length > 0 ? mapped : prev))
+        }
+        setMatchesLoading(false)
+      }
+    }
+    addMatchesListener(onMatches)
     return () => {
-      mounted = false
+      cancelled = true
+      removeMatchesListener(onMatches)
+      unsubscribeMatchesMany(['cricket', 'tennis', 'soccer'])
     }
   }, [])
 
@@ -778,7 +934,11 @@ export const LandingPage = ({ onOpenLogin, onOpenSignup, onOpenHome, navigation:
             <Text style={styles.errorText}>{gamesError}</Text>
           </View>
         ) : (
-          sections.map(renderSection)
+          sections.map(section => (
+            <React.Fragment key={section.title}>
+              {renderSection(section)}
+            </React.Fragment>
+          ))
         )}
 
         <View style={styles.sectionWrap}>
@@ -813,10 +973,6 @@ export const LandingPage = ({ onOpenLogin, onOpenSignup, onOpenHome, navigation:
           <View style={styles.loadingWrap}>
             <ActivityIndicator color={colors.accent} />
             <Text style={styles.loadingText}>Loading top matches...</Text>
-          </View>
-        ) : matchesError ? (
-          <View style={styles.errorWrap}>
-            <Text style={styles.errorText}>{matchesError}</Text>
           </View>
         ) : (
           <>

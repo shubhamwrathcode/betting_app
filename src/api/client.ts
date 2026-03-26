@@ -19,6 +19,7 @@ type RequestConfig = {
   method?: 'GET' | 'POST' | 'PUT' | 'DELETE'
   token?: string
   body?: unknown
+  skipAuth?: boolean
 }
 
 // Global method to set token from AuthContext
@@ -34,24 +35,26 @@ export const apiClient = async <T>(
   
   let authHeader = {}
   
-  if (config.token) {
-    authHeader = { Authorization: `Bearer ${config.token}` }
-  } else if (memoryToken) {
-    // High-end Expert fallback: use memory token if available
-    authHeader = { Authorization: `Bearer ${memoryToken}` }
-  } else {
-    try {
-      const storedData = await AsyncStorage.getItem('user_auth')
-      if (storedData) {
-        const parsed = JSON.parse(storedData)
-        const token = parsed.token || parsed.accessToken
-        if (token) {
-          authHeader = { Authorization: `Bearer ${token}` }
+  if (!config.skipAuth) {
+    if (config.token) {
+      authHeader = { Authorization: `Bearer ${config.token}` }
+    } else if (memoryToken) {
+      // High-end Expert fallback: use memory token if available
+      authHeader = { Authorization: `Bearer ${memoryToken}` }
+    } else {
+      try {
+        const storedData = await AsyncStorage.getItem('user_auth')
+        if (storedData) {
+          const parsed = JSON.parse(storedData)
+          const token = parsed.token || parsed.accessToken
+          if (token) {
+            authHeader = { Authorization: `Bearer ${token}` }
+          }
         }
+      } catch (e) {
+        // Don't log full error to avoid console clutter if rebuild is pending
+        console.warn('AsyncStorage not ready (rebuild required). Using memory fallback.')
       }
-    } catch (e) {
-      // Don't log full error to avoid console clutter if rebuild is pending
-      console.warn('AsyncStorage not ready (rebuild required). Using memory fallback.')
     }
   }
 

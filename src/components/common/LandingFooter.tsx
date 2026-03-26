@@ -12,7 +12,8 @@ import {
 import { ImageAssets } from '../ImageAssets'
 import { AppFonts } from '../AppFonts'
 
-if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+const isFabricRenderer = !!(globalThis as any)?.nativeFabricUIManager
+if (!isFabricRenderer && Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true)
 }
 

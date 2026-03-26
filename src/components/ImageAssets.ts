@@ -215,6 +215,9 @@ export const ImageAssets = {
   homeline: require('../../assets/AppImages/home-line.png'),
   menuLine: require('../../assets/AppImages/menu-line.png'),
   honorofkingsfill: require('../../assets/AppImages/honor-of-kings-fill.png'),
+  bookopenfill: require('../../assets/AppImages/book-open-fill.png'),
+
+
 
 
 

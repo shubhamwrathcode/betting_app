@@ -1,6 +1,6 @@
 import React from 'react'
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs'
-import { createStackNavigator } from '@react-navigation/stack'
+import { createStackNavigator, TransitionPresets } from '@react-navigation/stack'
 import { LoginPage } from '../screens/auth/LoginPage'
 import { ForgotPasswordPage } from '../screens/auth/ForgotPasswordPage'
 import LandingPage from '../screens/auth/LandingPage'
@@ -8,6 +8,7 @@ import GameScreen from '../screens/home/GameScreen'
 import CasinoScreen from '../screens/home/CasinoScreen'
 import InPlayScreen from '../screens/home/InPlayScreen'
 import SportsbookScreen from '../screens/home/SportsbookScreen'
+import SearchScreen from '../screens/home/SearchScreen'
 import { BottomTab } from '../components/common/BottomTab'
 import { View, Text, StyleSheet, ActivityIndicator } from 'react-native'
 import { useAuth } from '../hooks/useAuth'
@@ -17,6 +18,7 @@ type RootStackParamList = {
   Login: { initialTab?: 'login' | 'signup' }
   ForgotPassword: undefined
   Game: { url: string; title: string }
+  Search: undefined
   AuthenticatedHome: undefined
 }
 
@@ -71,6 +73,14 @@ export const RootNavigator = () => {
       <Stack.Screen name="Login" component={LoginPage} />
       <Stack.Screen name="ForgotPassword" component={ForgotPasswordPage} />
       <Stack.Screen name="Game" component={GameScreen} />
+      <Stack.Screen
+        name="Search"
+        component={SearchScreen}
+        options={{
+          gestureEnabled: true,
+          ...TransitionPresets.ModalSlideFromBottomIOS,
+        }}
+      />
     </Stack.Navigator>
   )
 }

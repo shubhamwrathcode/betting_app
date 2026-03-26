@@ -12,7 +12,7 @@ import {
   View,
   Dimensions,
 } from 'react-native'
-import { useNavigation } from '@react-navigation/native'
+import { useNavigation, useRoute } from '@react-navigation/native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import Toast from 'react-native-toast-message'
 import { ImageAssets } from '../../components/ImageAssets'
@@ -36,10 +36,20 @@ type Provider = { code?: string; name?: string; totalGames?: number; categories?
 type CasinoGame = {
   code?: string
   gameCode?: string
+  game_code?: string
   name?: string
+  gameName?: string
+  game_name?: string
   providerCode?: string
+  provider_code?: string
   thumbnail?: string
   thumb?: string
+  image?: string
+  icon?: string
+  logo?: string
+  category?: Array<{ code?: string; name?: string }>
+  categoryCode?: string
+  category_code?: string
 }
 
 const BANNER_IMAGES = [
@@ -68,8 +78,17 @@ const getCategoryImage = (cat: ProviderCategory) => {
   return typeof raw === 'string' ? raw.trim() : ''
 }
 
+const getGameImage = (game: CasinoGame) =>
+  game.thumb || game.thumbnail || game.image || game.icon || game.logo || ''
+
+const getGameCode = (game: CasinoGame) => game.gameCode || game.game_code || game.code || ''
+const getGameName = (game: CasinoGame) =>
+  game.name || game.gameName || game.game_name || game.code || 'Game'
+const getGameProviderCode = (game: CasinoGame) => game.providerCode || game.provider_code || 'all'
+
 const CasinoScreen = () => {
   const navigation = useNavigation<any>()
+  const route = useRoute<any>()
   const insets = useSafeAreaInsets()
   const { isAuthenticated } = useAuth()
   const sliderRef = useRef<FlatList<number> | null>(null)
@@ -81,6 +100,7 @@ const CasinoScreen = () => {
   const [categoryThumbErrors, setCategoryThumbErrors] = useState<Set<string>>(new Set())
   const [providerModalOpen, setProviderModalOpen] = useState(false)
   const [providerSearch, setProviderSearch] = useState('')
+  const [selectedGameFilter, setSelectedGameFilter] = useState('')
   const [selectedProviderCode, setSelectedProviderCode] = useState('all')
   const [selectedCategoryCode, setSelectedCategoryCode] = useState('lobby')
 
@@ -90,6 +110,15 @@ const CasinoScreen = () => {
   const [gamesLoading, setGamesLoading] = useState(true)
   const [loadingMore, setLoadingMore] = useState(false)
   const [launchingGame, setLaunchingGame] = useState(false)
+
+  useEffect(() => {
+    const selection = route.params?.searchSelection
+    if (!selection?.key) return
+    setSelectedProviderCode(selection.providerCode || 'all')
+    setSelectedCategoryCode(selection.categoryCode || 'lobby')
+    setSelectedGameFilter(selection.gameName || '')
+    navigation.setParams({ searchSelection: undefined })
+  }, [navigation, route.params?.searchSelection])
 
   useEffect(() => {
     let mounted = true
@@ -214,8 +243,8 @@ const CasinoScreen = () => {
       navigation.navigate('Login', { initialTab: 'login' })
       return
     }
-    const gameCode = game.gameCode || game.code
-    const providerCode = game.providerCode || 'all'
+    const gameCode = getGameCode(game)
+    const providerCode = getGameProviderCode(game)
     if (!gameCode) return
     setLaunchingGame(true)
     try {
@@ -230,7 +259,7 @@ const CasinoScreen = () => {
         d?.iframeUrl ||
         (typeof d === 'string' ? d : null)
       if (!launchURL) throw new Error('Launch URL missing')
-      navigation.navigate('Game', { url: launchURL, title: game.name || 'Game' })
+      navigation.navigate('Game', { url: launchURL, title: getGameName(game) })
     } catch {
       Toast.show({
         type: 'error',
@@ -242,8 +271,15 @@ const CasinoScreen = () => {
     }
   }
 
+  const displayedGames = useMemo(() => {
+    const q = selectedGameFilter.trim().toLowerCase()
+    if (!q) return games
+    const filtered = games.filter(g => getGameName(g).toLowerCase().includes(q))
+    return filtered.length > 0 ? filtered : games
+  }, [games, selectedGameFilter])
+
   const renderGameItem = ({ item }: { item: CasinoGame }) => {
-    const img = item.thumbnail || item.thumb
+    const img = getGameImage(item)
     return (
       <Pressable style={styles.gameCard} onPress={() => handleLaunchGame(item)}>
         <Image
@@ -255,7 +291,7 @@ const CasinoScreen = () => {
           <Image source={ImageAssets.playbtnPng} style={styles.playIcon} />
         </View>
         <Text style={styles.gameName} numberOfLines={1}>
-          {item.name || item.code || 'Game'}
+          {getGameName(item)}
         </Text>
       </Pressable>
     )
@@ -267,6 +303,7 @@ const CasinoScreen = () => {
         <LandingHeader
           onLoginPress={() => navigation.navigate('Login', { initialTab: 'login' })}
           onSignupPress={() => navigation.navigate('Login', { initialTab: 'signup' })}
+            onSearchPress={() => navigation.navigate('Search')}
         />
       ) : null}
 
@@ -335,7 +372,7 @@ const CasinoScreen = () => {
         </View>
 
         <View style={styles.filterRow}>
-          <Pressable style={styles.searchBtn}>
+          <Pressable style={styles.searchBtn} onPress={() => navigation.navigate('Search')}>
             <Image source={ImageAssets.search} style={styles.searchIcon} />
           </Pressable>
           <Pressable style={styles.providerBtn} onPress={() => setProviderModalOpen(true)}>
@@ -355,11 +392,13 @@ const CasinoScreen = () => {
             const key = cat.code || cat.name || 'cat'
             const thumb = getCategoryImage(cat)
             const hasThumb = thumb.length > 0 && !categoryThumbErrors.has(key)
-            console.log(cat,'===image===')
             return (
               <Pressable
                 key={cat.code || 'cat'}
-                onPress={() => setSelectedCategoryCode(cat.code || 'lobby')}
+                onPress={() => {
+                  setSelectedGameFilter('')
+                  setSelectedCategoryCode(cat.code || 'lobby')
+                }}
                 style={[styles.categoryChip, active && styles.categoryChipActive]}
               >
                 {hasThumb ? (
@@ -400,15 +439,15 @@ const CasinoScreen = () => {
             <ActivityIndicator color="#2E90FA" />
             <Text style={styles.emptyText}>Loading games...</Text>
           </View>
-        ) : games.length === 0 ? (
+        ) : displayedGames.length === 0 ? (
           <View style={styles.emptyWrap}>
             <Text style={styles.emptyText}>No games in this category.</Text>
           </View>
         ) : (
           <View style={styles.gamesGrid}>
-            {games?.map((game, idx) => (
+            {displayedGames?.map((game, idx) => (
               <View
-                key={`${game.providerCode || 'all'}-${game.gameCode || game.code || idx}`}
+                key={`${getGameProviderCode(game)}-${getGameCode(game) || idx}`}
                 style={styles.gameCell}
               >
                 {renderGameItem({ item: game })}
@@ -440,6 +479,7 @@ const CasinoScreen = () => {
                 onPress={() => {
                   setSelectedProviderCode('all')
                   setSelectedCategoryCode('lobby')
+                  setSelectedGameFilter('')
                   setProviderModalOpen(false)
                 }}
               >
@@ -455,6 +495,7 @@ const CasinoScreen = () => {
                     onPress={() => {
                       setSelectedProviderCode(p.code || 'all')
                       setSelectedCategoryCode('lobby')
+                      setSelectedGameFilter('')
                       setProviderModalOpen(false)
                     }}
                   >

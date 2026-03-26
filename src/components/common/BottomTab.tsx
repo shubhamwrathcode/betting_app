@@ -13,6 +13,11 @@ const tabsConfig: Record<string, { label: string, Icon: any }> = {
 }
 
 export const BottomTab = ({ state, descriptors, navigation }: BottomTabBarProps) => {
+  const focusedRoute = state.routes[state.index]
+  const focusedOptions = descriptors[focusedRoute.key]?.options
+  const focusedTabStyle = focusedOptions?.tabBarStyle as { display?: string } | undefined
+  if (focusedTabStyle?.display === 'none') return null
+
   return (
     <View style={styles.container}>
       <View style={styles.navRow}>

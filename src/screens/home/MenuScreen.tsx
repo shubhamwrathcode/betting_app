@@ -17,6 +17,7 @@ const TAB_NAME_TO_MENU_KEY: Record<string, string> = {
   Casino: 'casino',
   InPlay: 'inplay',
   SportsBook: 'sportsbook',
+  Transactions: 'transactions',
 }
 
 function getFocusedTabScreenName(drawerState: any): string | undefined {
@@ -30,7 +31,7 @@ function getFocusedTabScreenName(drawerState: any): string | undefined {
 /** Tab to restore when leaving Game Rules / Promotions (hidden tab bar routes). */
 function getReturnTabNameForAuxScreens(navState: any): string {
   const name = getFocusedTabScreenName(navState)
-  if (!name || name === 'Menu' || name === 'GameRules' || name === 'Promotions' || name === 'ReferralRewards')
+  if (!name || name === 'Menu' || name === 'GameRules' || name === 'Promotions' || name === 'ReferralRewards' || name === 'Transactions')
     return 'Home'
   return name
 }
@@ -65,6 +66,12 @@ const MenuScreen = ({ navigation }: any) => {
     navigation.navigate('Tabs', { screen: 'ReferralRewards', params: { returnToTab } })
   }
 
+  const openTransactions = () => {
+    const returnToTab = getReturnTabNameForAuxScreens(navigation.getState())
+    navigation.closeDrawer()
+    navigation.navigate('Tabs', { screen: 'Transactions', params: { returnToTab } })
+  }
+
   const menuItems: MenuItem[] = [
     { key: 'casino', label: 'Casino', icon: ImageAssets.spade, onPress: () => goToTab('Casino') },
     { key: 'inplay', label: 'InPlay', icon: ImageAssets.gamepad, onPress: () => goToTab('InPlay') },
@@ -72,7 +79,7 @@ const MenuScreen = ({ navigation }: any) => {
     { key: 'rules', label: 'Game Rules', icon: ImageAssets.bookopenfill, onPress: openGameRules },
     { key: 'promotions', label: 'Promotions', icon: ImageAssets.promotion, onPress: openPromotions },
     { key: 'referral', label: 'Referral', icon: ImageAssets.Referal, onPress: openReferralRewards },
-    { key: 'transactions', label: 'Transactions', icon: ImageAssets.transactionMenu, onPress: () => {} },
+    { key: 'transactions', label: 'Transactions', icon: ImageAssets.transactionMenu, onPress: openTransactions },
     { key: 'mybets', label: 'My Bets', icon: ImageAssets.flagBets, onPress: () => {} },
     { key: 'bethistory', label: 'Bet History', icon: ImageAssets.bethistory, onPress: () => {} },
     { key: 'gamehistory', label: 'Game History', icon: ImageAssets.gamepad, onPress: () => {} },

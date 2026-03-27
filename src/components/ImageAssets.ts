@@ -229,6 +229,9 @@ export const ImageAssets = {
   document: require('../../assets/AppImages/document.png'),
   trophy: require('../../assets/AppImages/trophy.png'),
   cricket: require('../../assets/AppImages/cricket.png'),
+  calendar: require('../../assets/AppImages/calendar.png'),
+  download: require('../../assets/AppImages/download.png'),
+
 
 
 

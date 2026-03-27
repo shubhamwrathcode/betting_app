@@ -27,6 +27,7 @@ export const API_ENDPOINTS = {
 
   // Wallet
   balance: '/api/v1/wallet/balance',
+  walletTransactions: '/api/v1/wallet/transactions',
 
   // Games
   gamesLanding: '/api/v1/games/landing',

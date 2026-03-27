@@ -12,6 +12,7 @@
   "dependencies": {
     "@react-native-async-storage/async-storage": "^1.21.0",
     "@react-native-clipboard/clipboard": "^1.16.3",
+    "@react-native-community/datetimepicker": "^9.1.0",
     "@react-native/new-app-screen": "0.84.1",
     "@react-navigation/bottom-tabs": "^7.15.7",
     "@react-navigation/drawer": "^7.9.7",
@@ -23,6 +24,7 @@
     "react-native-fast-image": "^8.6.3",
     "react-native-gesture-handler": "^2.30.0",
     "react-native-linear-gradient": "^2.8.3",
+    "react-native-modal-datetime-picker": "^18.0.0",
     "react-native-reanimated": "^4.3.0",
     "react-native-safe-area-context": "^5.7.0",
     "react-native-screens": "^4.24.0",

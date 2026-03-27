@@ -76,5 +76,17 @@ export const apiClient = async <T>(
     )
   }
 
-  return response.json() as Promise<T>
+  const contentType = response.headers.get('content-type') || ''
+  if (contentType.includes('application/json')) {
+    return response.json() as Promise<T>
+  }
+  const text = await response.text()
+  if (!text) {
+    return {} as T
+  }
+  try {
+    return JSON.parse(text) as T
+  } catch {
+    return text as unknown as T
+  }
 }

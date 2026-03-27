@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ActivityIndicator,
   FlatList,
@@ -20,6 +20,7 @@ import { API_ENDPOINTS } from '../../api/endpoints'
 import { AppFonts } from '../../components/AppFonts'
 import { ImageAssets } from '../../components/ImageAssets'
 import { LandingHeader } from '../../components/common/LandingHeader'
+import { AppDatePickerField } from '../../components/common/AppDatePickerField'
 import { useAuth } from '../../hooks/useAuth'
 import TotalProfitSvg from '../../../assets/AppImages/total_profit.svg'
 import TotalReferralsSvg from '../../../assets/AppImages/total_referrals.svg'
@@ -75,8 +76,9 @@ const ReferralRewardsScreen = () => {
   const navigation = useNavigation<any>()
   const route = useRoute<RouteProp<{ ReferralRewards: ReferralRouteParams }, 'ReferralRewards'>>()
   const insets = useSafeAreaInsets()
-  const { isAuthenticated } = useAuth()
+  const { isAuthenticated, logout } = useAuth()
   const returnToTab = route.params?.returnToTab ?? 'Home'
+  const sessionExpiredHandledRef = useRef(false)
 
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<'dashboard' | 'referrals'>('dashboard')
@@ -86,6 +88,7 @@ const ReferralRewardsScreen = () => {
   const [balanceInfo, setBalanceInfo] = useState<AnyObj>({})
   const [referralCode, setReferralCode] = useState('')
   const [referralLink, setReferralLink] = useState('')
+
   const [applyCodeInput, setApplyCodeInput] = useState('')
   const [isApplying, setIsApplying] = useState(false)
   const [isClaiming, setIsClaiming] = useState(false)
@@ -112,7 +115,29 @@ const ReferralRewardsScreen = () => {
 
   const goBack = useCallback(() => navigation.navigate(returnToTab), [navigation, returnToTab])
 
+  const isSessionExpiredError = useCallback((error: any) => {
+    const msg = String(error?.message || '')
+    return msg.includes('401') || msg.includes('UNAUTHORIZED') || msg.includes('Demo session expired or invalid')
+  }, [])
+
+  const handleSessionExpired = useCallback(async () => {
+    if (sessionExpiredHandledRef.current) return
+    sessionExpiredHandledRef.current = true
+    try {
+      await logout()
+    } catch {
+      // Ignore logout cleanup errors and continue redirect flow
+    } finally {
+      setLoading(false)
+      Toast.show({ type: 'error', text1: 'Session expired, please login again' })
+      navigation.navigate('Login', { initialTab: 'login' })
+    }
+  }, [logout, navigation])
+
   const call = useCallback(async (endpoint: string, query?: AnyObj) => {
+    if (sessionExpiredHandledRef.current) {
+      throw new Error('Session expired')
+    }
     const qs = query
       ? `?${new URLSearchParams(
           Object.entries(query).reduce((acc, [k, v]) => {
@@ -138,9 +163,12 @@ const ReferralRewardsScreen = () => {
         message: error?.message,
         error,
       })
+      if (isSessionExpiredError(error)) {
+        void handleSessionExpired()
+      }
       throw error
     }
-  }, [])
+  }, [handleSessionExpired, isSessionExpiredError])
 
   const setCodeAndLink = useCallback((data: AnyObj, balance?: AnyObj) => {
     const nested = data?.data && typeof data.data === 'object' ? data.data : {}
@@ -187,9 +215,13 @@ const ReferralRewardsScreen = () => {
       ) || '',
     )
 
-    setReferralCode(code)
-    setReferralLink(link || (code ? `https://gaming.wrathcode.com/signup?r=${encodeURIComponent(code)}` : ''))
-  }, [])
+    const resolvedCode = code || referralCode
+    const fallbackLink = resolvedCode ? `https://gaming.wrathcode.com/signup?r=${encodeURIComponent(resolvedCode)}` : ''
+
+    // Keep previous values if a later API response doesn't carry referral fields.
+    setReferralCode(prev => code || prev)
+    setReferralLink(prev => link || prev || fallbackLink)
+  }, [referralCode])
   const loadPlatformConfig = useCallback(async () => {
     try {
       const res = await call(API_ENDPOINTS.platformConfig)
@@ -234,41 +266,59 @@ const ReferralRewardsScreen = () => {
 
   const loadRewardsHistory = useCallback(
     async (page = 1) => {
-      const res = await call(API_ENDPOINTS.referralRewardsHistory, {
-        page,
-        limit: REWARDS_PAGE_SIZE,
-        from: rewardsFrom || undefined,
-        to: rewardsTo || undefined,
-        search: rewardSearchQuery.trim() || undefined,
-      })
-      const data = res?.data ?? res
-      const list = Array.isArray(data?.data) ? data.data : Array.isArray(data?.rewards) ? data.rewards : Array.isArray(data) ? data : []
-      setRewardsHistory(list)
-      const pag = data?.pagination ?? data
-      const total = Number(firstOf(pag?.totalRecords, data?.total, data?.totalCount, list.length) || 0)
-      const pages = Number(firstOf(pag?.totalPages, data?.totalPages, Math.max(1, Math.ceil(total / REWARDS_PAGE_SIZE))) || 1)
-      setRewardsPage(page)
-      setRewardsTotalPages(Math.max(1, pages))
+      try {
+        const res = await call(API_ENDPOINTS.referralRewardsHistory, {
+          page,
+          limit: REWARDS_PAGE_SIZE,
+          from: rewardsFrom || undefined,
+          to: rewardsTo || undefined,
+          search: rewardSearchQuery.trim() || undefined,
+        })
+        const data = res?.data ?? res
+        const list = Array.isArray(data?.data) ? data.data : Array.isArray(data?.rewards) ? data.rewards : Array.isArray(data) ? data : []
+        setRewardsHistory(list)
+        const pag = data?.pagination ?? data
+        const total = Number(firstOf(pag?.totalRecords, data?.total, data?.totalCount, list.length) || 0)
+        const pages = Number(firstOf(pag?.totalPages, data?.totalPages, Math.max(1, Math.ceil(total / REWARDS_PAGE_SIZE))) || 1)
+        setRewardsPage(page)
+        setRewardsTotalPages(Math.max(1, pages))
+      } catch (e: any) {
+        setRewardsHistory([])
+        setRewardsPage(1)
+        setRewardsTotalPages(1)
+        if (!sessionExpiredHandledRef.current) {
+          Toast.show({ type: 'error', text1: 'Rewards history unavailable', text2: e?.message || 'Please try again later.' })
+        }
+      }
     },
     [call, rewardSearchQuery, rewardsFrom, rewardsTo],
   )
 
   const loadReferralList = useCallback(
     async (page = 1) => {
-      const res = await call(API_ENDPOINTS.referralList, {
-        page,
-        limit: REFERRALS_PAGE_SIZE,
-        from: referralFrom || undefined,
-        to: referralTo || undefined,
-        search: referralSearchQuery.trim() || undefined,
-      })
-      const data = res?.data ?? res
-      const list = Array.isArray(data?.data) ? data.data : Array.isArray(data?.referrals) ? data.referrals : Array.isArray(data) ? data : []
-      setReferralList(list)
-      const total = Number(firstOf(data?.total, data?.totalCount, data?.pagination?.totalRecords, list.length) || 0)
-      const pages = Number(firstOf(data?.totalPages, data?.pagination?.totalPages, Math.max(1, Math.ceil(total / REFERRALS_PAGE_SIZE))) || 1)
-      setRefPage(page)
-      setRefTotalPages(Math.max(1, pages))
+      try {
+        const res = await call(API_ENDPOINTS.referralList, {
+          page,
+          limit: REFERRALS_PAGE_SIZE,
+          from: referralFrom || undefined,
+          to: referralTo || undefined,
+          search: referralSearchQuery.trim() || undefined,
+        })
+        const data = res?.data ?? res
+        const list = Array.isArray(data?.data) ? data.data : Array.isArray(data?.referrals) ? data.referrals : Array.isArray(data) ? data : []
+        setReferralList(list)
+        const total = Number(firstOf(data?.total, data?.totalCount, data?.pagination?.totalRecords, list.length) || 0)
+        const pages = Number(firstOf(data?.totalPages, data?.pagination?.totalPages, Math.max(1, Math.ceil(total / REFERRALS_PAGE_SIZE))) || 1)
+        setRefPage(page)
+        setRefTotalPages(Math.max(1, pages))
+      } catch (e: any) {
+        setReferralList([])
+        setRefPage(1)
+        setRefTotalPages(1)
+        if (!sessionExpiredHandledRef.current) {
+          Toast.show({ type: 'error', text1: 'Referrals unavailable', text2: e?.message || 'Please try again later.' })
+        }
+      }
     },
     [call, referralFrom, referralSearchQuery, referralTo],
   )
@@ -282,9 +332,11 @@ const ReferralRewardsScreen = () => {
       try {
         setLoading(true)
         await loadPlatformConfig()
-        await Promise.all([loadDashboard(), loadBalance(), loadProfit(1), loadRewardsHistory(1)])
+        await Promise.allSettled([loadDashboard(), loadBalance(), loadProfit(1), loadRewardsHistory(1)])
       } catch (e: any) {
+      if (!sessionExpiredHandledRef.current) {
         Toast.show({ type: 'error', text1: 'Error', text2: e?.message || 'Failed to load referral program.' })
+      }
       } finally {
         setLoading(false)
       }
@@ -331,11 +383,15 @@ const ReferralRewardsScreen = () => {
       await Promise.all([loadDashboard(), loadBalance()])
     } catch (e: any) {
       console.log('[ReferralRewards][API][POST][ERROR]', { endpoint: API_ENDPOINTS.referralApply, message: e?.message, error: e })
-      Toast.show({ type: 'error', text1: e?.message || 'Could not apply referral code.' })
+      if (isSessionExpiredError(e)) {
+        void handleSessionExpired()
+      } else {
+        Toast.show({ type: 'error', text1: e?.message || 'Could not apply referral code.' })
+      }
     } finally {
       setIsApplying(false)
     }
-  }, [applyCodeInput, loadBalance, loadDashboard])
+  }, [applyCodeInput, handleSessionExpired, isSessionExpiredError, loadBalance, loadDashboard])
 
   const handleClaim = useCallback(async () => {
     try {
@@ -353,11 +409,15 @@ const ReferralRewardsScreen = () => {
       await Promise.all([loadDashboard(), loadBalance()])
     } catch (e: any) {
       console.log('[ReferralRewards][API][POST][ERROR]', { endpoint: API_ENDPOINTS.referralClaim, message: e?.message, error: e })
-      Toast.show({ type: 'error', text1: e?.message || 'Unable to claim.' })
+      if (isSessionExpiredError(e)) {
+        void handleSessionExpired()
+      } else {
+        Toast.show({ type: 'error', text1: e?.message || 'Unable to claim.' })
+      }
     } finally {
       setIsClaiming(false)
     }
-  }, [loadBalance, loadDashboard])
+  }, [handleSessionExpired, isSessionExpiredError, loadBalance, loadDashboard])
 
   const handleExport = useCallback(async () => {
     try {
@@ -366,9 +426,17 @@ const ReferralRewardsScreen = () => {
         from: referralFrom || undefined,
         to: referralTo || undefined,
       })
-      const url = firstOf(res?.data?.url, res?.url, res?.data?.downloadUrl)
-      if (url) {
-        Clipboard.setString(String(url))
+      const raw = (res as any)?.data ?? res
+      const csvOrUrl = firstOf(
+        raw?.url,
+        raw?.downloadUrl,
+        raw?.csv,
+        raw?.data,
+        typeof raw === 'string' ? raw : undefined,
+      )
+
+      if (csvOrUrl) {
+        Clipboard.setString(String(csvOrUrl))
         Toast.show({ type: 'success', text1: 'Export link copied to clipboard.' })
       } else {
         Toast.show({ type: 'success', text1: 'Export requested successfully.' })
@@ -519,8 +587,8 @@ const ReferralRewardsScreen = () => {
         <View style={styles.tableHeader}>
           <Text style={styles.tableTitle}>Rewards History</Text>
           <View style={styles.filtersWrap}>
-            <TextInput style={styles.dateInput} placeholder="dd/mm/yyyy" placeholderTextColor="#a2b0c5" value={rewardsFrom} onChangeText={setRewardsFrom} />
-            <TextInput style={styles.dateInput} placeholder="dd/mm/yyyy" placeholderTextColor="#a2b0c5" value={rewardsTo} onChangeText={setRewardsTo} />
+            <AppDatePickerField value={rewardsFrom} onChange={setRewardsFrom} placeholder="From date (dd/mm/yyyy)" maximumDate={new Date()} />
+            <AppDatePickerField value={rewardsTo} onChange={setRewardsTo} placeholder="To date (dd/mm/yyyy)" maximumDate={new Date()} />
             <View style={styles.searchRow}>
               <Pressable style={styles.filterBtn} onPress={() => loadRewardsHistory(1)}>
                 <Text style={styles.filterBtnText}>Apply</Text>
@@ -561,24 +629,37 @@ const ReferralRewardsScreen = () => {
       <View style={styles.tableHeader}>
         <Text style={styles.tableTitle}>Referrals History</Text>
         <View style={styles.filtersWrap}>
-          <TextInput style={styles.dateInput} placeholder="dd/mm/yyyy" placeholderTextColor="#a2b0c5" value={referralFrom} onChangeText={setReferralFrom} />
-          <TextInput style={styles.dateInput} placeholder="dd/mm/yyyy" placeholderTextColor="#a2b0c5" value={referralTo} onChangeText={setReferralTo} />
-          <TextInput style={styles.searchInputWide} placeholder="Search by name, mobile..." placeholderTextColor="#7f8ca0" value={referralSearchQuery} onChangeText={setReferralSearchQuery} />
-          <Pressable style={styles.filterBtn} onPress={() => loadReferralList(1)}><Text style={styles.filterBtnText}>Apply</Text></Pressable>
-          <Pressable style={[styles.exportBtn, isExporting && styles.claimBtnDisabled]} onPress={handleExport} disabled={isExporting}>
-            <Text style={styles.exportBtnText}>{isExporting ? 'Exporting...' : 'Export CSV'}</Text>
-          </Pressable>
+          <AppDatePickerField value={referralFrom} onChange={setReferralFrom} placeholder="From date (dd/mm/yyyy)" maximumDate={new Date()} />
+          <AppDatePickerField value={referralTo} onChange={setReferralTo} placeholder="To date (dd/mm/yyyy)" maximumDate={new Date()} />
+          <View style={styles.actionRow}>
+            <Pressable style={[styles.filterBtn, styles.actionBtn]} onPress={() => loadReferralList(1)}>
+              <Text style={styles.filterBtnText}>Apply</Text>
+            </Pressable>
+            <Pressable style={[styles.exportBtn, styles.actionBtn, isExporting && styles.claimBtnDisabled]} onPress={handleExport} disabled={isExporting}>
+               <Image source={ImageAssets.download} tintColor={'#fff'} style={{width: 20, height: 20}}/>
+              <Text style={styles.exportBtnText}>{isExporting ? 'Exporting...' : 'CSV'}</Text>
+            </Pressable>
+          </View>
+          <TextInput
+            style={styles.searchInputWide}
+            placeholder="Search by name, mobile..."
+            placeholderTextColor="#7f8ca0"
+            value={referralSearchQuery}
+            onChangeText={setReferralSearchQuery}
+          />
         </View>
       </View>
-      <View style={styles.tableHeadRowReferral}>
-        <Text style={styles.colHash}>#</Text>
-        <Text style={styles.colDate}>Date & Time</Text>
-        <Text style={styles.colUser}>User Name</Text>
-        <Text style={styles.colMobile}>Mobile</Text>
-        <Text style={styles.colStatus}>Status</Text>
-        <Text style={styles.colEarn}>Total Earnings</Text>
-      </View>
-      <View style={styles.tableBodyLarge}>
+      {referralList.length > 0 ? (
+        <View style={styles.tableHeadRowReferral}>
+          <Text style={styles.colHash}>#</Text>
+          <Text style={styles.colDate}>Date & Time</Text>
+          <Text style={styles.colUser}>User Name</Text>
+          <Text style={styles.colMobile}>Mobile</Text>
+          <Text style={styles.colStatus}>Status</Text>
+          <Text style={styles.colEarn}>Total Earnings</Text>
+        </View>
+      ) : null}
+      <View style={[styles.tableBodyLarge, referralList.length === 0 && styles.tableBodyStandalone]}>
         {referralList.length === 0 ? (
           <Text style={styles.noDataText}>No referrals yet</Text>
         ) : (
@@ -684,19 +765,21 @@ const styles = StyleSheet.create({
   tableHeader: { marginBottom: 10 },
   tableTitle: { color: '#fff', fontFamily: AppFonts.montserratBold, fontSize: 17, marginBottom: 8 },
   searchRow: { flexDirection: 'row', gap: 10, alignItems: 'center' },
+  actionRow: { flexDirection: 'row', gap: 8, alignItems: 'center' },
+  actionBtn: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   filtersWrap: { gap: 8 },
   searchInput: { flex: 1, borderRadius: 10, borderWidth: 1, borderColor: '#314157', backgroundColor: '#1a2433', color: '#fff', paddingHorizontal: 12, paddingVertical: 10, fontFamily: AppFonts.montserratMedium, fontSize: 14 },
   searchInputWide: { borderRadius: 10, borderWidth: 1, borderColor: '#314157', backgroundColor: '#1a2433', color: '#fff', paddingHorizontal: 12, paddingVertical: 10, fontFamily: AppFonts.montserratMedium, fontSize: 14 },
-  dateInput: { borderRadius: 10, borderWidth: 1, borderColor: '#314157', backgroundColor: '#1a2433', color: '#fff', paddingHorizontal: 12, paddingVertical: 10, fontFamily: AppFonts.montserratMedium, fontSize: 14 },
   filterBtn: { backgroundColor: '#F97A31', paddingHorizontal: 18, paddingVertical: 10, borderRadius: 10 },
   filterBtnText: { color: '#fff', fontFamily: AppFonts.montserratBold, fontSize: 14 },
-  exportBtn: { backgroundColor: 'rgba(255,255,255,0.12)', paddingHorizontal: 14, paddingVertical: 10, borderRadius: 10 },
+  exportBtn: { backgroundColor: 'rgba(255,255,255,0.12)', paddingHorizontal: 14, paddingVertical: 10, borderRadius: 10,flexDirection:"row",justifyContent:"center",alignItems:"center",gap:10 },
   exportBtnText: { color: '#fff', fontFamily: AppFonts.montserratSemiBold, fontSize: 13 },
   tableHeadRow: { flexDirection: 'row', backgroundColor: '#0d1724', borderRadius: 8, borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)', paddingVertical: 12, paddingHorizontal: 8 },
   tableHeadRowRewards: { flexDirection: 'row', backgroundColor: '#0d1724', borderRadius: 8, borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)', paddingVertical: 12, paddingHorizontal: 6 },
   tableHeadRowReferral: { flexDirection: 'row', backgroundColor: '#0d1724', borderRadius: 8, borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)', paddingVertical: 12, paddingHorizontal: 6 },
   tableBody: { minHeight: 200, borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)', borderTopWidth: 0, borderBottomLeftRadius: 8, borderBottomRightRadius: 8, justifyContent: 'center' },
   tableBodyLarge: { minHeight: 240, borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)', borderTopWidth: 0, borderBottomLeftRadius: 8, borderBottomRightRadius: 8, justifyContent: 'center' },
+  tableBodyStandalone: { borderTopWidth: 1, borderTopLeftRadius: 8, borderTopRightRadius: 8 },
   tableRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 8, paddingVertical: 11, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.06)' },
   tableRowRewards: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 6, paddingVertical: 11, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.06)' },
   tableRowReferral: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 6, paddingVertical: 11, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.06)' },

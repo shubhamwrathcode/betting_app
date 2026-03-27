@@ -13,6 +13,8 @@ export const API_ENDPOINTS = {
   // User & Profile
   userProfile: '/api/v1/auth/profile',
   platformConfig: '/api/v1/user/platform-configuration',
+  transactionLimits: '/api/v1/user/transaction-limits',
+  depositAccountsMaster: '/api/v1/user/deposit-accounts/master',
 
   // Referral
   referralDashboard: '/api/v1/referral/dashboard',
@@ -29,6 +31,9 @@ export const API_ENDPOINTS = {
   balance: '/api/v1/wallet/balance',
   walletStatement: '/api/v1/wallet/statement',
   walletTransactions: '/api/v1/wallet/transactions',
+  walletDeposit: '/api/v1/wallet/deposit',
+  walletGenerateAddress: '/api/v1/wallet/generate-address',
+  walletVerifyUsdtDeposit: '/api/v1/wallet/verify-usdt-deposit',
 
   /** GET /api/v1/account/statement – same as web getAccountStatementFromAccount */
   accountStatement: '/api/v1/account/statement',
@@ -48,6 +53,9 @@ export const API_ENDPOINTS = {
   sportsbookCricketMatches: '/api/v1/sportsbook/cricket/matches',
   sportsbookTennisMatches: '/api/v1/sportsbook/tennis/matches',
   sportsbookSoccerMatches: '/api/v1/sportsbook/soccer/matches',
+  sportsbookBetOpen: '/api/v1/sportsbook/bet/open',
+  sportsbookBetHistory: '/api/v1/sportsbook/bet/history',
+  sportsbookBetCancel: '/api/v1/sportsbook/bet',
   sportsbookProfitLoss: '/api/v1/sportsbook/profit-loss',
 
   // Support

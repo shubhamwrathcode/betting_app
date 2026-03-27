@@ -15,11 +15,14 @@ import GameRulesScreen from '../screens/home/GameRulesScreen'
 import PromotionsScreen from '../screens/home/PromotionsScreen'
 import ReferralRewardsScreen from '../screens/home/ReferralRewardsScreen'
 import TransactionsScreen from '../screens/home/TransactionsScreen'
+import MyBetsScreen from '../screens/home/MyBetsScreen'
+import BetHistoryScreen from '../screens/home/BetHistoryScreen'
 import GameHistoryScreen from '../screens/home/GameHistoryScreen'
 import MyWalletScreen from '../screens/home/MyWalletScreen'
 import BettingProfitLossScreen from '../screens/home/BettingProfitLossScreen'
 import AccountStatementScreen from '../screens/home/AccountStatementScreen'
 import SupportScreen from '../screens/home/SupportScreen'
+import DepositScreen from '../screens/home/DepositScreen'
 import MenuScreen from '../screens/home/MenuScreen'
 import { BottomTab } from '../components/common/BottomTab'
 import { View, ActivityIndicator } from 'react-native'
@@ -73,11 +76,14 @@ const TabsNavigator = (props: any) => {
       <Tab.Screen name="Promotions" component={PromotionsScreen} />
       <Tab.Screen name="ReferralRewards" component={ReferralRewardsScreen} />
       <Tab.Screen name="Transactions" component={TransactionsScreen} />
+      <Tab.Screen name="MyBets" component={MyBetsScreen} />
+      <Tab.Screen name="BetHistory" component={BetHistoryScreen} />
       <Tab.Screen name="GameHistory" component={GameHistoryScreen} />
       <Tab.Screen name="MyWallet" component={MyWalletScreen} />
       <Tab.Screen name="BettingProfitLoss" component={BettingProfitLossScreen} />
       <Tab.Screen name="AccountStatement" component={AccountStatementScreen} />
       <Tab.Screen name="Support" component={SupportScreen} />
+      <Tab.Screen name="Deposit" component={DepositScreen} />
     </Tab.Navigator>
   )
 }

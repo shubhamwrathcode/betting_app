@@ -18,11 +18,14 @@ const TAB_NAME_TO_MENU_KEY: Record<string, string> = {
   InPlay: 'inplay',
   SportsBook: 'sportsbook',
   Transactions: 'transactions',
+  MyBets: 'mybets',
+  BetHistory: 'bethistory',
   GameHistory: 'gamehistory',
   MyWallet: 'wallet',
   BettingProfitLoss: 'pl',
   AccountStatement: 'statement',
   Support: 'support',
+  Deposit: 'deposit',
 }
 
 function getFocusedTabScreenName(drawerState: any): string | undefined {
@@ -36,7 +39,7 @@ function getFocusedTabScreenName(drawerState: any): string | undefined {
 /** Tab to restore when leaving Game Rules / Promotions (hidden tab bar routes). */
 function getReturnTabNameForAuxScreens(navState: any): string {
   const name = getFocusedTabScreenName(navState)
-  if (!name || name === 'Menu' || name === 'GameRules' || name === 'Promotions' || name === 'ReferralRewards' || name === 'Transactions' || name === 'GameHistory' || name === 'MyWallet' || name === 'BettingProfitLoss' || name === 'AccountStatement' || name === 'Support')
+  if (!name || name === 'Menu' || name === 'GameRules' || name === 'Promotions' || name === 'ReferralRewards' || name === 'Transactions' || name === 'MyBets' || name === 'BetHistory' || name === 'GameHistory' || name === 'MyWallet' || name === 'BettingProfitLoss' || name === 'AccountStatement' || name === 'Support' || name === 'Deposit')
     return 'Home'
   return name
 }
@@ -77,6 +80,18 @@ const MenuScreen = ({ navigation }: any) => {
     navigation.navigate('Tabs', { screen: 'Transactions', params: { returnToTab } })
   }
 
+  const openMyBets = () => {
+    const returnToTab = getReturnTabNameForAuxScreens(navigation.getState())
+    navigation.closeDrawer()
+    navigation.navigate('Tabs', { screen: 'MyBets', params: { returnToTab } })
+  }
+
+  const openBetHistory = () => {
+    const returnToTab = getReturnTabNameForAuxScreens(navigation.getState())
+    navigation.closeDrawer()
+    navigation.navigate('Tabs', { screen: 'BetHistory', params: { returnToTab } })
+  }
+
   const openGameHistory = () => {
     const returnToTab = getReturnTabNameForAuxScreens(navigation.getState())
     navigation.closeDrawer()
@@ -107,6 +122,12 @@ const MenuScreen = ({ navigation }: any) => {
     navigation.navigate('Tabs', { screen: 'Support', params: { returnToTab } })
   }
 
+  const openDeposit = () => {
+    const returnToTab = getReturnTabNameForAuxScreens(navigation.getState())
+    navigation.closeDrawer()
+    navigation.navigate('Tabs', { screen: 'Deposit', params: { returnToTab } })
+  }
+
   const menuItems: MenuItem[] = [
     { key: 'casino', label: 'Casino', icon: ImageAssets.spade, onPress: () => goToTab('Casino') },
     { key: 'inplay', label: 'InPlay', icon: ImageAssets.gamepad, onPress: () => goToTab('InPlay') },
@@ -115,8 +136,8 @@ const MenuScreen = ({ navigation }: any) => {
     { key: 'promotions', label: 'Promotions', icon: ImageAssets.promotion, onPress: openPromotions },
     { key: 'referral', label: 'Referral', icon: ImageAssets.Referal, onPress: openReferralRewards },
     { key: 'transactions', label: 'Transactions', icon: ImageAssets.transactionMenu, onPress: openTransactions },
-    { key: 'mybets', label: 'My Bets', icon: ImageAssets.flagBets, onPress: () => {} },
-    { key: 'bethistory', label: 'Bet History', icon: ImageAssets.bethistory, onPress: () => {} },
+    { key: 'mybets', label: 'My Bets', icon: ImageAssets.flagBets, onPress: openMyBets },
+    { key: 'bethistory', label: 'Bet History', icon: ImageAssets.bethistory, onPress: openBetHistory },
     { key: 'gamehistory', label: 'Game History', icon: ImageAssets.gamepad, onPress: openGameHistory },
     { key: 'wallet', label: 'My Wallet', icon: ImageAssets.walletfill, onPress: openMyWallet },
     { key: 'pl', label: 'Betting P&L', icon: ImageAssets.linechart, onPress: openBettingProfitLoss },
@@ -130,7 +151,7 @@ const MenuScreen = ({ navigation }: any) => {
         <View style={styles.ctaRow}>
           <PrimaryButton
             title="Deposit"
-            onPress={() => {}}
+            onPress={openDeposit}
             colors={['#2B9454', '#1F7E46']}
             style={StyleSheet.flatten([styles.ctaBtn, styles.depositBtn])}
             textStyle={styles.ctaText}

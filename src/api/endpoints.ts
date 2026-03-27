@@ -30,6 +30,9 @@ export const API_ENDPOINTS = {
   walletStatement: '/api/v1/wallet/statement',
   walletTransactions: '/api/v1/wallet/transactions',
 
+  /** GET /api/v1/account/statement – same as web getAccountStatementFromAccount */
+  accountStatement: '/api/v1/account/statement',
+
   // Games
   gamesLanding: '/api/v1/games/landing',
   gamesList: '/api/v1/games',
@@ -46,4 +49,7 @@ export const API_ENDPOINTS = {
   sportsbookTennisMatches: '/api/v1/sportsbook/tennis/matches',
   sportsbookSoccerMatches: '/api/v1/sportsbook/soccer/matches',
   sportsbookProfitLoss: '/api/v1/sportsbook/profit-loss',
+
+  // Support
+  supportTickets: '/api/v1/support/tickets',
 }

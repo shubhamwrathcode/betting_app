@@ -16,7 +16,7 @@ export const API_BASE_URL =
   'https://gamingbackend.wrathcode.com'
 
 type RequestConfig = {
-  method?: 'GET' | 'POST' | 'PUT' | 'DELETE'
+  method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
   token?: string
   body?: unknown
   skipAuth?: boolean

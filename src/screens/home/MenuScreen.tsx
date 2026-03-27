@@ -21,6 +21,8 @@ const TAB_NAME_TO_MENU_KEY: Record<string, string> = {
   GameHistory: 'gamehistory',
   MyWallet: 'wallet',
   BettingProfitLoss: 'pl',
+  AccountStatement: 'statement',
+  Support: 'support',
 }
 
 function getFocusedTabScreenName(drawerState: any): string | undefined {
@@ -34,7 +36,7 @@ function getFocusedTabScreenName(drawerState: any): string | undefined {
 /** Tab to restore when leaving Game Rules / Promotions (hidden tab bar routes). */
 function getReturnTabNameForAuxScreens(navState: any): string {
   const name = getFocusedTabScreenName(navState)
-  if (!name || name === 'Menu' || name === 'GameRules' || name === 'Promotions' || name === 'ReferralRewards' || name === 'Transactions' || name === 'GameHistory' || name === 'MyWallet' || name === 'BettingProfitLoss')
+  if (!name || name === 'Menu' || name === 'GameRules' || name === 'Promotions' || name === 'ReferralRewards' || name === 'Transactions' || name === 'GameHistory' || name === 'MyWallet' || name === 'BettingProfitLoss' || name === 'AccountStatement' || name === 'Support')
     return 'Home'
   return name
 }
@@ -93,6 +95,18 @@ const MenuScreen = ({ navigation }: any) => {
     navigation.navigate('Tabs', { screen: 'BettingProfitLoss', params: { returnToTab } })
   }
 
+  const openAccountStatement = () => {
+    const returnToTab = getReturnTabNameForAuxScreens(navigation.getState())
+    navigation.closeDrawer()
+    navigation.navigate('Tabs', { screen: 'AccountStatement', params: { returnToTab } })
+  }
+
+  const openSupport = () => {
+    const returnToTab = getReturnTabNameForAuxScreens(navigation.getState())
+    navigation.closeDrawer()
+    navigation.navigate('Tabs', { screen: 'Support', params: { returnToTab } })
+  }
+
   const menuItems: MenuItem[] = [
     { key: 'casino', label: 'Casino', icon: ImageAssets.spade, onPress: () => goToTab('Casino') },
     { key: 'inplay', label: 'InPlay', icon: ImageAssets.gamepad, onPress: () => goToTab('InPlay') },
@@ -106,8 +120,8 @@ const MenuScreen = ({ navigation }: any) => {
     { key: 'gamehistory', label: 'Game History', icon: ImageAssets.gamepad, onPress: openGameHistory },
     { key: 'wallet', label: 'My Wallet', icon: ImageAssets.walletfill, onPress: openMyWallet },
     { key: 'pl', label: 'Betting P&L', icon: ImageAssets.linechart, onPress: openBettingProfitLoss },
-    { key: 'statement', label: 'Account Statement', icon: ImageAssets.bankfill, onPress: () => {} },
-    { key: 'support', label: 'Live Support', icon: ImageAssets.customerSupport, onPress: () => {} },
+    { key: 'statement', label: 'Account Statement', icon: ImageAssets.bankfill, onPress: openAccountStatement },
+    { key: 'support', label: 'Live Support', icon: ImageAssets.customerSupport, onPress: openSupport },
   ]
 
   return (

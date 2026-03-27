@@ -16,6 +16,8 @@ import PromotionsScreen from '../screens/home/PromotionsScreen'
 import ReferralRewardsScreen from '../screens/home/ReferralRewardsScreen'
 import TransactionsScreen from '../screens/home/TransactionsScreen'
 import GameHistoryScreen from '../screens/home/GameHistoryScreen'
+import MyWalletScreen from '../screens/home/MyWalletScreen'
+import BettingProfitLossScreen from '../screens/home/BettingProfitLossScreen'
 import MenuScreen from '../screens/home/MenuScreen'
 import { BottomTab } from '../components/common/BottomTab'
 import { View, ActivityIndicator } from 'react-native'
@@ -70,6 +72,8 @@ const TabsNavigator = (props: any) => {
       <Tab.Screen name="ReferralRewards" component={ReferralRewardsScreen} />
       <Tab.Screen name="Transactions" component={TransactionsScreen} />
       <Tab.Screen name="GameHistory" component={GameHistoryScreen} />
+      <Tab.Screen name="MyWallet" component={MyWalletScreen} />
+      <Tab.Screen name="BettingProfitLoss" component={BettingProfitLossScreen} />
     </Tab.Navigator>
   )
 }

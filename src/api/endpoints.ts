@@ -35,6 +35,10 @@ export const API_ENDPOINTS = {
   gamesProviders: '/api/v1/games/providers',
   gamesCategories: '/api/v1/games/categories',
   gamesLaunch: '/api/v1/games/launch',
+  gamesHistory: '/api/v1/games/history',
+  gamesTransactions: '/api/v1/games/transactions',
+  gamesTransactionHistory: '/api/v1/games/transaction-history',
+  gamesSportsbookTransactions: '/api/v1/games/sportsbook/transactions',
 
   // Sportsbook
   sportsbookCricketMatches: '/api/v1/sportsbook/cricket/matches',

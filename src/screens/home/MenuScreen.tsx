@@ -18,6 +18,7 @@ const TAB_NAME_TO_MENU_KEY: Record<string, string> = {
   InPlay: 'inplay',
   SportsBook: 'sportsbook',
   Transactions: 'transactions',
+  GameHistory: 'gamehistory',
 }
 
 function getFocusedTabScreenName(drawerState: any): string | undefined {
@@ -31,7 +32,7 @@ function getFocusedTabScreenName(drawerState: any): string | undefined {
 /** Tab to restore when leaving Game Rules / Promotions (hidden tab bar routes). */
 function getReturnTabNameForAuxScreens(navState: any): string {
   const name = getFocusedTabScreenName(navState)
-  if (!name || name === 'Menu' || name === 'GameRules' || name === 'Promotions' || name === 'ReferralRewards' || name === 'Transactions')
+  if (!name || name === 'Menu' || name === 'GameRules' || name === 'Promotions' || name === 'ReferralRewards' || name === 'Transactions' || name === 'GameHistory')
     return 'Home'
   return name
 }
@@ -72,6 +73,12 @@ const MenuScreen = ({ navigation }: any) => {
     navigation.navigate('Tabs', { screen: 'Transactions', params: { returnToTab } })
   }
 
+  const openGameHistory = () => {
+    const returnToTab = getReturnTabNameForAuxScreens(navigation.getState())
+    navigation.closeDrawer()
+    navigation.navigate('Tabs', { screen: 'GameHistory', params: { returnToTab } })
+  }
+
   const menuItems: MenuItem[] = [
     { key: 'casino', label: 'Casino', icon: ImageAssets.spade, onPress: () => goToTab('Casino') },
     { key: 'inplay', label: 'InPlay', icon: ImageAssets.gamepad, onPress: () => goToTab('InPlay') },
@@ -82,7 +89,7 @@ const MenuScreen = ({ navigation }: any) => {
     { key: 'transactions', label: 'Transactions', icon: ImageAssets.transactionMenu, onPress: openTransactions },
     { key: 'mybets', label: 'My Bets', icon: ImageAssets.flagBets, onPress: () => {} },
     { key: 'bethistory', label: 'Bet History', icon: ImageAssets.bethistory, onPress: () => {} },
-    { key: 'gamehistory', label: 'Game History', icon: ImageAssets.gamepad, onPress: () => {} },
+    { key: 'gamehistory', label: 'Game History', icon: ImageAssets.gamepad, onPress: openGameHistory },
     { key: 'wallet', label: 'My Wallet', icon: ImageAssets.walletfill, onPress: () => {} },
     { key: 'pl', label: 'Betting P&L', icon: ImageAssets.linechart, onPress: () => {} },
     { key: 'statement', label: 'Account Statement', icon: ImageAssets.bankfill, onPress: () => {} },

@@ -32,8 +32,13 @@ export const API_ENDPOINTS = {
   walletStatement: '/api/v1/wallet/statement',
   walletTransactions: '/api/v1/wallet/transactions',
   walletDeposit: '/api/v1/wallet/deposit',
+  walletWithdrawal: '/api/v1/wallet/withdrawal',
+  walletSendWithdrawalOtp: '/api/v1/wallet/send-withdrawal-otp',
   walletGenerateAddress: '/api/v1/wallet/generate-address',
   walletVerifyUsdtDeposit: '/api/v1/wallet/verify-usdt-deposit',
+
+  // Bank accounts
+  bankAccounts: '/api/v1/bank-accounts',
 
   /** GET /api/v1/account/statement – same as web getAccountStatementFromAccount */
   accountStatement: '/api/v1/account/statement',

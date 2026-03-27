@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { AppFonts } from '../../components/AppFonts'
 import { ImageAssets } from '../../components/ImageAssets'
 import { PrimaryButton } from '../../components/common/PrimaryButton'
+import { useAuth } from '../../hooks/useAuth'
 
 type MenuItem = {
   key: string
@@ -26,6 +27,7 @@ const TAB_NAME_TO_MENU_KEY: Record<string, string> = {
   AccountStatement: 'statement',
   Support: 'support',
   Deposit: 'deposit',
+  Withdrawal: 'withdrawal',
 }
 
 function getFocusedTabScreenName(drawerState: any): string | undefined {
@@ -39,13 +41,14 @@ function getFocusedTabScreenName(drawerState: any): string | undefined {
 /** Tab to restore when leaving Game Rules / Promotions (hidden tab bar routes). */
 function getReturnTabNameForAuxScreens(navState: any): string {
   const name = getFocusedTabScreenName(navState)
-  if (!name || name === 'Menu' || name === 'GameRules' || name === 'Promotions' || name === 'ReferralRewards' || name === 'Transactions' || name === 'MyBets' || name === 'BetHistory' || name === 'GameHistory' || name === 'MyWallet' || name === 'BettingProfitLoss' || name === 'AccountStatement' || name === 'Support' || name === 'Deposit')
+  if (!name || name === 'Menu' || name === 'GameRules' || name === 'Promotions' || name === 'ReferralRewards' || name === 'Transactions' || name === 'MyBets' || name === 'BetHistory' || name === 'GameHistory' || name === 'MyWallet' || name === 'BettingProfitLoss' || name === 'AccountStatement' || name === 'Support' || name === 'Deposit' || name === 'Withdrawal')
     return 'Home'
   return name
 }
 
 const MenuScreen = ({ navigation }: any) => {
   const insets = useSafeAreaInsets()
+  const { isAuthenticated } = useAuth()
   const activeMenuKey = useNavigationState(state => {
     const tabName = getFocusedTabScreenName(state)
     return tabName ? TAB_NAME_TO_MENU_KEY[tabName] : null
@@ -123,27 +126,44 @@ const MenuScreen = ({ navigation }: any) => {
   }
 
   const openDeposit = () => {
+    if (!isAuthenticated) {
+      navigation.closeDrawer()
+      navigation.navigate('Login', { initialTab: 'login' })
+      return
+    }
     const returnToTab = getReturnTabNameForAuxScreens(navigation.getState())
     navigation.closeDrawer()
     navigation.navigate('Tabs', { screen: 'Deposit', params: { returnToTab } })
   }
 
-  const menuItems: MenuItem[] = [
+  const openWithdrawal = () => {
+    if (!isAuthenticated) {
+      navigation.closeDrawer()
+      navigation.navigate('Login', { initialTab: 'login' })
+      return
+    }
+    const returnToTab = getReturnTabNameForAuxScreens(navigation.getState())
+    navigation.closeDrawer()
+    navigation.navigate('Tabs', { screen: 'Withdrawal', params: { returnToTab } })
+  }
+
+  const allMenuItems: (MenuItem & { authOnly?: boolean })[] = [
     { key: 'casino', label: 'Casino', icon: ImageAssets.spade, onPress: () => goToTab('Casino') },
     { key: 'inplay', label: 'InPlay', icon: ImageAssets.gamepad, onPress: () => goToTab('InPlay') },
     { key: 'sportsbook', label: 'SportsBook', icon: ImageAssets.basketballFill, onPress: () => goToTab('SportsBook') },
     { key: 'rules', label: 'Game Rules', icon: ImageAssets.bookopenfill, onPress: openGameRules },
     { key: 'promotions', label: 'Promotions', icon: ImageAssets.promotion, onPress: openPromotions },
-    { key: 'referral', label: 'Referral', icon: ImageAssets.Referal, onPress: openReferralRewards },
-    { key: 'transactions', label: 'Transactions', icon: ImageAssets.transactionMenu, onPress: openTransactions },
-    { key: 'mybets', label: 'My Bets', icon: ImageAssets.flagBets, onPress: openMyBets },
-    { key: 'bethistory', label: 'Bet History', icon: ImageAssets.bethistory, onPress: openBetHistory },
-    { key: 'gamehistory', label: 'Game History', icon: ImageAssets.gamepad, onPress: openGameHistory },
-    { key: 'wallet', label: 'My Wallet', icon: ImageAssets.walletfill, onPress: openMyWallet },
-    { key: 'pl', label: 'Betting P&L', icon: ImageAssets.linechart, onPress: openBettingProfitLoss },
-    { key: 'statement', label: 'Account Statement', icon: ImageAssets.bankfill, onPress: openAccountStatement },
-    { key: 'support', label: 'Live Support', icon: ImageAssets.customerSupport, onPress: openSupport },
+    { key: 'referral', label: 'Referral', icon: ImageAssets.Referal, onPress: openReferralRewards, authOnly: true },
+    { key: 'transactions', label: 'Transactions', icon: ImageAssets.transactionMenu, onPress: openTransactions, authOnly: true },
+    { key: 'mybets', label: 'My Bets', icon: ImageAssets.flagBets, onPress: openMyBets, authOnly: true },
+    { key: 'bethistory', label: 'Bet History', icon: ImageAssets.bethistory, onPress: openBetHistory, authOnly: true },
+    { key: 'gamehistory', label: 'Game History', icon: ImageAssets.gamepad, onPress: openGameHistory, authOnly: true },
+    { key: 'wallet', label: 'My Wallet', icon: ImageAssets.walletfill, onPress: openMyWallet, authOnly: true },
+    { key: 'pl', label: 'Betting P&L', icon: ImageAssets.linechart, onPress: openBettingProfitLoss, authOnly: true },
+    { key: 'statement', label: 'Account Statement', icon: ImageAssets.bankfill, onPress: openAccountStatement, authOnly: true },
+    { key: 'support', label: 'Live Support', icon: ImageAssets.customerSupport, onPress: openSupport, authOnly: true },
   ]
+  const menuItems = allMenuItems
 
   return (
     <View style={styles.screen}>
@@ -159,7 +179,7 @@ const MenuScreen = ({ navigation }: any) => {
           />
           <PrimaryButton
             title="Withdraw"
-            onPress={() => {}}
+            onPress={openWithdrawal}
             colors={['#F17B31', '#CD6828']}
             style={StyleSheet.flatten([styles.ctaBtn, styles.withdrawBtn])}
             textStyle={styles.ctaText}
@@ -174,7 +194,14 @@ const MenuScreen = ({ navigation }: any) => {
               <Pressable
                 key={item.key}
                 style={[styles.menuItem, active && styles.menuItemActive]}
-                onPress={item.onPress}
+                onPress={() => {
+                  if (item.authOnly && !isAuthenticated) {
+                    navigation.closeDrawer()
+                    navigation.navigate('Login', { initialTab: 'login' })
+                    return
+                  }
+                  item.onPress()
+                }}
               >
                 <View style={styles.iconBox}>
                   <Image source={item.icon} style={[styles.menuIcon, active && styles.menuIconActive]} />

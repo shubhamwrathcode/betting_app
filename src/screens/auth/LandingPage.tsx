@@ -721,8 +721,8 @@ export const LandingPage = ({ onOpenLogin, onOpenSignup, onOpenHome, navigation:
       </View>
     )}
     <ScrollView showsVerticalScrollIndicator={false} style={styles.scroll} contentContainerStyle={styles.content}>
-      <View style={[styles.mainContentArea, isAuthenticated && { paddingTop: insets.top }]}>
-        {!isAuthenticated && <LandingHeader onLoginPress={onOpenLogin} onSignupPress={onOpenSignup} />}
+      <View style={styles.mainContentArea}>
+        <LandingHeader onLoginPress={onOpenLogin} onSignupPress={onOpenSignup} />
 
         <ImageBackground source={ImageAssets.herobgMainJpg} style={styles.heroWrap} resizeMode="cover">
           <View style={styles.heroOverlay}>
@@ -885,11 +885,13 @@ export const LandingPage = ({ onOpenLogin, onOpenSignup, onOpenHome, navigation:
                 <Text style={styles.heroSubBullet}>•</Text> Instant Withdrawal
               </Text>
             </View>
-            <View style={styles.heroCtaRow}>
-              <Pressable style={styles.signupBtn} onPress={onOpenSignup}>
-                <Text style={styles.signupBtnText}>Sign Up and Play</Text>
-              </Pressable>
-              <Pressable style={styles.depositBtn} onPress={onOpenHome}>
+            <View style={[styles.heroCtaRow, isAuthenticated && styles.heroCtaRowLoggedIn]}>
+              {!isAuthenticated ? (
+                <Pressable style={styles.signupBtn} onPress={onOpenSignup}>
+                  <Text style={styles.signupBtnText}>Sign Up and Play</Text>
+                </Pressable>
+              ) : null}
+              <Pressable style={styles.depositBtn} onPress={isAuthenticated ? onOpenHome : onOpenLogin}>
                 <Text style={styles.signupBtnText}>Deposit Now</Text>
               </Pressable>
               <View style={styles.iconGroup}>
@@ -1148,6 +1150,10 @@ const styles = StyleSheet.create({
     width: '100%',
     gap: 6,
     marginBottom: 8,
+  },
+  heroCtaRowLoggedIn: {
+    justifyContent: 'center',
+    gap: 10,
   },
   signupBtn: { backgroundColor: '#E07B34', borderRadius: 10, paddingHorizontal: 10, paddingVertical: 8 },
   depositBtn: { backgroundColor: '#1F2B45', borderRadius: 10, paddingHorizontal: 10, paddingVertical: 8 },

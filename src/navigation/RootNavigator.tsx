@@ -23,6 +23,7 @@ import BettingProfitLossScreen from '../screens/home/BettingProfitLossScreen'
 import AccountStatementScreen from '../screens/home/AccountStatementScreen'
 import SupportScreen from '../screens/home/SupportScreen'
 import DepositScreen from '../screens/home/DepositScreen'
+import WithdrawalScreen from '../screens/home/WithdrawalScreen'
 import MenuScreen from '../screens/home/MenuScreen'
 import { BottomTab } from '../components/common/BottomTab'
 import { View, ActivityIndicator } from 'react-native'
@@ -84,6 +85,7 @@ const TabsNavigator = (props: any) => {
       <Tab.Screen name="AccountStatement" component={AccountStatementScreen} />
       <Tab.Screen name="Support" component={SupportScreen} />
       <Tab.Screen name="Deposit" component={DepositScreen} />
+      <Tab.Screen name="Withdrawal" component={WithdrawalScreen} />
     </Tab.Navigator>
   )
 }

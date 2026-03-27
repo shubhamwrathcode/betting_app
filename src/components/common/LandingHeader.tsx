@@ -1,9 +1,10 @@
-import React from 'react'
-import { Image, Pressable, StyleSheet, Text, View } from 'react-native'
+import React, { useCallback, useMemo, useRef, useState } from 'react'
+import { Image, Modal, Pressable, StyleSheet, Text, View } from 'react-native'
 import { ImageAssets } from '../ImageAssets'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { AppFonts } from '../AppFonts'
 import { useAuth } from '../../hooks/useAuth'
+import { useNavigation } from '@react-navigation/native'
 
 type LandingHeaderProps = {
   onLoginPress: () => void
@@ -19,45 +20,105 @@ export const LandingHeader = ({
   onBackPress,
 }: LandingHeaderProps) => {
   const insets = useSafeAreaInsets()
-  const { isAuthenticated, user } = useAuth()
+  const navigation = useNavigation<any>()
+  const { isAuthenticated, user, logout } = useAuth()
+  const [profileOpen, setProfileOpen] = useState(false)
+  const profileAnchorRef = useRef<View>(null)
+  const [profileMenuRect, setProfileMenuRect] = useState({ top: 0, left: 0 })
   const walletBalance = Number(user?.wallet?.balance ?? 0)
   const walletLabel = `₹${walletBalance.toLocaleString('en-IN', {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   })}`
+  const displayName = useMemo(() => {
+    const fullName = String(user?.fullName ?? '').trim()
+    if (fullName) return fullName.toUpperCase()
+    const username = String(user?.username ?? '').trim()
+    if (username) return username.toUpperCase()
+    const mobile = String(user?.mobile ?? '').trim()
+    if (mobile) return `USER ${mobile.slice(-4)}`
+    return 'USER'
+  }, [user?.fullName, user?.mobile, user?.username])
+
+  const handleLogout = async () => {
+    setProfileOpen(false)
+    await logout()
+    navigation.navigate('Login', { initialTab: 'login' })
+  }
+
+  const openProfileMenu = useCallback(() => {
+    profileAnchorRef.current?.measureInWindow((x, y, width, height) => {
+      setProfileMenuRect({
+        top: y + height + 6,
+        left: Math.max(8, x + width - 280),
+      })
+      setProfileOpen(true)
+    })
+  }, [])
 
   if (isAuthenticated) {
     return (
-      <View style={[styles.topBar, { paddingTop: insets.top + 8 }]}>
-        <View style={styles.leftCluster}>
-          {/* {onBackPress ? (
-            <Pressable onPress={onBackPress} style={styles.backBtn} hitSlop={10} accessibilityRole="button">
-              <Text style={styles.backChevron}>‹</Text>
-            </Pressable>
-          ) : null} */}
-          <Image source={ImageAssets.logoPng} style={styles.logoAuth} resizeMode="contain" />
-        </View>
-
-        <View style={styles.authActions}>
-          <View style={styles.walletChip}>
-            <Image source={ImageAssets.enPng} style={styles.flagIcon} resizeMode="contain" />
-            <Text style={styles.walletText}>{walletLabel}</Text>
+      <>
+        <View style={[styles.topBar, { paddingTop: insets.top + 8 }]}>
+          <View style={styles.leftCluster}>
+            <Image source={ImageAssets.logoPng} style={styles.logoAuth} resizeMode="contain" />
           </View>
 
-          <Pressable style={[styles.iconBtn, styles.plusBtn]} onPress={() => {}}>
-            <Text style={styles.plusText}>+</Text>
-          </Pressable>
+          <View style={styles.authActions}>
+            <View style={styles.walletChip}>
+             <Text>🇮🇳</Text>
+              <Text style={styles.walletText}>{walletLabel}</Text>
+            </View>
 
-          <Pressable style={styles.iconBtn} onPress={onSearchPress}>
-            <Image source={ImageAssets.search} style={{ width: 16, height: 16, tintColor: '#fff' }} resizeMode="contain" />
-          </Pressable>
+            <Pressable style={[styles.iconBtn, styles.plusBtn]} onPress={() => navigation.navigate('Tabs', { screen: 'Deposit' })}>
+              <Text style={styles.plusText}>+</Text>
+            </Pressable>
 
-          <Pressable style={styles.profileBtn} onPress={() => {}}>
-            <Image source={ImageAssets.userVectorPng} style={styles.profileImg} resizeMode="cover" />
-            <Image source={ImageAssets.down} style={styles.profileDown} resizeMode="contain" />
-          </Pressable>
+            <Pressable style={styles.iconBtn} onPress={onSearchPress}>
+              <Image source={ImageAssets.search} style={{ width: 16, height: 16, tintColor: '#fff' }} resizeMode="contain" />
+            </Pressable>
+
+            <View ref={profileAnchorRef} collapsable={false}>
+              <Pressable style={styles.profileBtn} onPress={openProfileMenu}>
+                <Image source={ImageAssets.userVectorPng} style={styles.profileImg} resizeMode="cover" />
+                <Image source={ImageAssets.down} style={styles.profileDown} resizeMode="contain" />
+              </Pressable>
+            </View>
+          </View>
         </View>
-      </View>
+
+        {profileOpen ? (
+          <Modal transparent visible={profileOpen} animationType="fade" onRequestClose={() => setProfileOpen(false)}>
+            <View style={styles.dropdownModalRoot}>
+              <Pressable style={styles.dropdownBackdrop} onPress={() => setProfileOpen(false)} />
+              <View style={[styles.dropdownCard, { top: profileMenuRect.top, left: profileMenuRect.left }]}>
+                <View style={styles.dropdownHeader}>
+                  <Image source={ImageAssets.userVectorPng} style={styles.dropdownUserImg} resizeMode="cover" />
+                  <Text style={styles.dropdownUserName}>{displayName}</Text>
+                </View>
+                <Pressable style={styles.dropdownItem} onPress={() => { setProfileOpen(false); navigation.navigate('Tabs', { screen: 'ReferralRewards' }) }}>
+                  <Text style={styles.dropdownItemText}>My Profile</Text>
+                </Pressable>
+                <Pressable style={styles.dropdownItem} onPress={() => { setProfileOpen(false); navigation.navigate('Tabs', { screen: 'AccountStatement' }) }}>
+                  <Text style={styles.dropdownItemText}>Account</Text>
+                </Pressable>
+                <Pressable style={styles.dropdownItem} onPress={() => { setProfileOpen(false); navigation.navigate('Tabs', { screen: 'Transactions' }) }}>
+                  <Text style={styles.dropdownItemText}>Transaction History</Text>
+                </Pressable>
+                <Pressable style={styles.dropdownItem} onPress={() => { setProfileOpen(false); navigation.navigate('Tabs', { screen: 'GameHistory' }) }}>
+                  <Text style={styles.dropdownItemText}>Game History</Text>
+                </Pressable>
+                <Pressable style={styles.dropdownItem} onPress={() => { setProfileOpen(false); navigation.navigate('Tabs', { screen: 'Withdrawal' }) }}>
+                  <Text style={styles.dropdownItemText}>Withdrawal</Text>
+                </Pressable>
+                <Pressable style={styles.logoutBtn} onPress={() => void handleLogout()}>
+                  <Text style={styles.logoutBtnText}>Log out</Text>
+                </Pressable>
+              </View>
+            </View>
+          </Modal>
+        ) : null}
+      </>
     )
   }
 
@@ -99,6 +160,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: 8,
+    zIndex: 20,
   },
   leftCluster: {
     flexDirection: 'row',
@@ -198,6 +260,66 @@ const styles = StyleSheet.create({
     width: 10,
     height: 10,
     tintColor: '#FFFFFF',
+  },
+  dropdownModalRoot: {
+    flex: 1,
+  },
+  dropdownBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.2)',
+  },
+  dropdownCard: {
+    position: 'absolute',
+    right: 10,
+    width: 280,
+    backgroundColor: '#12233A',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#283A52',
+    overflow: 'hidden',
+  },
+  dropdownHeader: {
+    paddingVertical: 18,
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#2A3C53',
+    alignItems: 'center',
+    gap: 10,
+  },
+  dropdownUserImg: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    borderWidth: 2,
+    borderColor: '#F3F6FF',
+  },
+  dropdownUserName: {
+    color: '#fff',
+    fontFamily: AppFonts.montserratBold,
+    fontSize: 14,
+  },
+  dropdownItem: {
+    minHeight: 48,
+    borderBottomWidth: 1,
+    borderBottomColor: '#22344B',
+    justifyContent: 'center',
+    paddingHorizontal: 16,
+  },
+  dropdownItemText: {
+    color: '#F5F8FF',
+    fontFamily: AppFonts.montserratSemiBold,
+    fontSize: 15,
+  },
+  logoutBtn: {
+    minHeight: 52,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#26374C',
+  },
+  logoutBtnText: {
+    color: '#FFFFFF',
+    fontFamily: AppFonts.montserratBold,
+    fontSize: 16,
   },
   iconBtnText: {
     color: '#FFFFFF',

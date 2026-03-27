@@ -231,6 +231,7 @@ export const ImageAssets = {
   cricket: require('../../assets/AppImages/cricket.png'),
   calendar: require('../../assets/AppImages/calendar.png'),
   download: require('../../assets/AppImages/download.png'),
+  indiaflag: require('../../assets/AppImages/indiaflag.png'),
 
 
 

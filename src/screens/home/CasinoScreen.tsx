@@ -13,7 +13,6 @@ import {
   Dimensions,
 } from 'react-native'
 import { useNavigation, useRoute } from '@react-navigation/native'
-import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import Toast from 'react-native-toast-message'
 import { ImageAssets } from '../../components/ImageAssets'
 import { AppFonts } from '../../components/AppFonts'
@@ -89,7 +88,6 @@ const getGameProviderCode = (game: CasinoGame) => game.providerCode || game.prov
 const CasinoScreen = () => {
   const navigation = useNavigation<any>()
   const route = useRoute<any>()
-  const insets = useSafeAreaInsets()
   const { isAuthenticated } = useAuth()
   const sliderRef = useRef<FlatList<number> | null>(null)
   const bannerWidth = Math.max(260, Dimensions.get('window').width - 24)
@@ -298,14 +296,12 @@ const CasinoScreen = () => {
   }
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top }]}>
-      {!isAuthenticated ? (
-        <LandingHeader
-          onLoginPress={() => navigation.navigate('Login', { initialTab: 'login' })}
-          onSignupPress={() => navigation.navigate('Login', { initialTab: 'signup' })}
-            onSearchPress={() => navigation.navigate('Search')}
-        />
-      ) : null}
+    <View style={styles.container}>
+      <LandingHeader
+        onLoginPress={() => navigation.navigate('Login', { initialTab: 'login' })}
+        onSignupPress={() => navigation.navigate('Login', { initialTab: 'signup' })}
+        onSearchPress={() => navigation.navigate('Search')}
+      />
 
       {launchingGame ? (
         <View style={styles.globalLoader}>

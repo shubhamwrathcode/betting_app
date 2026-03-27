@@ -14,6 +14,17 @@ export const API_ENDPOINTS = {
   userProfile: '/api/v1/auth/profile',
   platformConfig: '/api/v1/user/platform-configuration',
 
+  // Referral
+  referralDashboard: '/api/v1/referral/dashboard',
+  referralBalance: '/api/v1/referral/balance',
+  referralList: '/api/v1/referral/referrals',
+  referralProfit: '/api/v1/referral/profit',
+  referralClaim: '/api/v1/referral/claim',
+  referralApply: '/api/v1/referral/apply',
+  referralExport: '/api/v1/referral/referrals/export',
+  referralRewardsLive: '/api/v1/referral/rewards/live',
+  referralRewardsHistory: '/api/v1/referral/rewards/history',
+
   // Wallet
   balance: '/api/v1/wallet/balance',
 

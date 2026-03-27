@@ -11,6 +11,9 @@ import CasinoScreen from '../screens/home/CasinoScreen'
 import InPlayScreen from '../screens/home/InPlayScreen'
 import SportsbookScreen from '../screens/home/SportsbookScreen'
 import SearchScreen from '../screens/home/SearchScreen'
+import GameRulesScreen from '../screens/home/GameRulesScreen'
+import PromotionsScreen from '../screens/home/PromotionsScreen'
+import ReferralRewardsScreen from '../screens/home/ReferralRewardsScreen'
 import MenuScreen from '../screens/home/MenuScreen'
 import { BottomTab } from '../components/common/BottomTab'
 import { View, ActivityIndicator } from 'react-native'
@@ -60,6 +63,9 @@ const TabsNavigator = (props: any) => {
       />
       <Tab.Screen name="InPlay" component={InPlayScreen} />
       <Tab.Screen name="SportsBook" component={SportsbookScreen} />
+      <Tab.Screen name="GameRules" component={GameRulesScreen} />
+      <Tab.Screen name="Promotions" component={PromotionsScreen} />
+      <Tab.Screen name="ReferralRewards" component={ReferralRewardsScreen} />
     </Tab.Navigator>
   )
 }

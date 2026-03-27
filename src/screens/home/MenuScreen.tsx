@@ -1,5 +1,6 @@
 import React from 'react'
 import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
+import { useNavigationState } from '@react-navigation/native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { AppFonts } from '../../components/AppFonts'
 import { ImageAssets } from '../../components/ImageAssets'
@@ -12,20 +13,65 @@ type MenuItem = {
   onPress: () => void
 }
 
+const TAB_NAME_TO_MENU_KEY: Record<string, string> = {
+  Casino: 'casino',
+  InPlay: 'inplay',
+  SportsBook: 'sportsbook',
+}
+
+function getFocusedTabScreenName(drawerState: any): string | undefined {
+  const tabsRoute = drawerState?.routes?.find((r: any) => r.name === 'Tabs')
+  const tabState = tabsRoute?.state
+  if (!tabState?.routes?.length) return undefined
+  const idx = typeof tabState.index === 'number' ? tabState.index : 0
+  return tabState.routes[idx]?.name
+}
+
+/** Tab to restore when leaving Game Rules / Promotions (hidden tab bar routes). */
+function getReturnTabNameForAuxScreens(navState: any): string {
+  const name = getFocusedTabScreenName(navState)
+  if (!name || name === 'Menu' || name === 'GameRules' || name === 'Promotions' || name === 'ReferralRewards')
+    return 'Home'
+  return name
+}
+
 const MenuScreen = ({ navigation }: any) => {
   const insets = useSafeAreaInsets()
+  const activeMenuKey = useNavigationState(state => {
+    const tabName = getFocusedTabScreenName(state)
+    return tabName ? TAB_NAME_TO_MENU_KEY[tabName] : null
+  })
+
   const goToTab = (screen: string) => {
     navigation.navigate('Tabs', { screen })
     navigation.closeDrawer()
+  }
+
+  const openGameRules = () => {
+    const returnToTab = getReturnTabNameForAuxScreens(navigation.getState())
+    navigation.closeDrawer()
+    navigation.navigate('Tabs', { screen: 'GameRules', params: { returnToTab } })
+  }
+
+  const openPromotions = () => {
+    const returnToTab = getReturnTabNameForAuxScreens(navigation.getState())
+    navigation.closeDrawer()
+    navigation.navigate('Tabs', { screen: 'Promotions', params: { returnToTab } })
+  }
+
+  const openReferralRewards = () => {
+    const returnToTab = getReturnTabNameForAuxScreens(navigation.getState())
+    navigation.closeDrawer()
+    navigation.navigate('Tabs', { screen: 'ReferralRewards', params: { returnToTab } })
   }
 
   const menuItems: MenuItem[] = [
     { key: 'casino', label: 'Casino', icon: ImageAssets.spade, onPress: () => goToTab('Casino') },
     { key: 'inplay', label: 'InPlay', icon: ImageAssets.gamepad, onPress: () => goToTab('InPlay') },
     { key: 'sportsbook', label: 'SportsBook', icon: ImageAssets.basketballFill, onPress: () => goToTab('SportsBook') },
-    { key: 'rules', label: 'Game Rules', icon: ImageAssets.bookopenfill, onPress: () => {} },
-    { key: 'promotions', label: 'Promotions', icon: ImageAssets.promotion, onPress: () => {} },
-    { key: 'referral', label: 'Referral', icon: ImageAssets.Referal, onPress: () => {} },
+    { key: 'rules', label: 'Game Rules', icon: ImageAssets.bookopenfill, onPress: openGameRules },
+    { key: 'promotions', label: 'Promotions', icon: ImageAssets.promotion, onPress: openPromotions },
+    { key: 'referral', label: 'Referral', icon: ImageAssets.Referal, onPress: openReferralRewards },
     { key: 'transactions', label: 'Transactions', icon: ImageAssets.transactionMenu, onPress: () => {} },
     { key: 'mybets', label: 'My Bets', icon: ImageAssets.flagBets, onPress: () => {} },
     { key: 'bethistory', label: 'Bet History', icon: ImageAssets.bethistory, onPress: () => {} },
@@ -60,7 +106,7 @@ const MenuScreen = ({ navigation }: any) => {
 
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.menuList}>
           {menuItems.map(item => {
-            const active = item.key === 'sportsbook'
+            const active = item.key === activeMenuKey
             return (
               <Pressable
                 key={item.key}
@@ -70,7 +116,7 @@ const MenuScreen = ({ navigation }: any) => {
                 <View style={styles.iconBox}>
                   <Image source={item.icon} style={[styles.menuIcon, active && styles.menuIconActive]} />
                 </View>
-                <Text style={styles.menuLabel}>{item.label}</Text>
+                <Text style={[styles.menuLabel, active && styles.menuLabelActive]}>{item.label}</Text>
               </Pressable>
             )
           })}
@@ -129,6 +175,7 @@ const styles = StyleSheet.create({
   menuIcon: { width: 18, height: 18, tintColor: '#C3CEDF', resizeMode: 'contain' },
   menuIconActive: { tintColor: '#FF8E40' },
   menuLabel: { color: '#EEF3FA', fontFamily: AppFonts.montserratMedium, fontSize: 15 },
+  menuLabelActive: { color: '#FF8E40', fontFamily: AppFonts.montserratSemiBold },
 })
 
 export default MenuScreen

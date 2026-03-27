@@ -225,10 +225,19 @@ export const ImageAssets = {
   bethistory: require('../../assets/AppImages/Bethistory.png'),
   linechart: require('../../assets/AppImages/linechart.png'),
   customerSupport: require('../../assets/AppImages/customerSupport.png'),
+  verified: require('../../assets/AppImages/verified.png'),
+  document: require('../../assets/AppImages/document.png'),
+  trophy: require('../../assets/AppImages/trophy.png'),
+  cricket: require('../../assets/AppImages/cricket.png'),
 
 
 
 
+
+
+  
+  
+  
 
 
 

@@ -18,10 +18,13 @@ export const BottomTab = ({ state, descriptors, navigation }: BottomTabBarProps)
   const focusedTabStyle = focusedOptions?.tabBarStyle as { display?: string } | undefined
   if (focusedTabStyle?.display === 'none') return null
 
+  const barRoutes = state.routes.filter(route => tabsConfig[route.name] != null)
+
   return (
     <View style={styles.container}>
       <View style={styles.navRow}>
-        {state.routes.map((route, index) => {
+        {barRoutes.map(route => {
+          const index = state.routes.indexOf(route)
           const { options } = descriptors[route.key]
           const label =
             options.tabBarLabel !== undefined

@@ -11,7 +11,6 @@ import {
   View,
 } from 'react-native'
 import { useNavigation } from '@react-navigation/native'
-import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { LandingHeader } from '../../components/common/LandingHeader'
 import { useAuth } from '../../hooks/useAuth'
 import { AppFonts } from '../../components/AppFonts'
@@ -118,7 +117,6 @@ const renderSectionIcon = (sport: SportTab) => {
 
 const InPlayScreen = () => {
   const navigation = useNavigation<any>()
-  const insets = useSafeAreaInsets()
   const { isAuthenticated } = useAuth()
   const sliderRef = useRef<FlatList<any> | null>(null)
   const bannerWidth = Math.max(260, Dimensions.get('window').width - 24)
@@ -189,14 +187,12 @@ const InPlayScreen = () => {
   }
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top }]}>
-      {!isAuthenticated ? (
-        <LandingHeader
-          onLoginPress={() => navigation.navigate('Login', { initialTab: 'login' })}
-          onSignupPress={() => navigation.navigate('Login', { initialTab: 'signup' })}
-          onSearchPress={() => navigation.navigate('Search')}
-        />
-      ) : null}
+    <View style={styles.container}>
+      <LandingHeader
+        onLoginPress={() => navigation.navigate('Login', { initialTab: 'login' })}
+        onSignupPress={() => navigation.navigate('Login', { initialTab: 'signup' })}
+        onSearchPress={() => navigation.navigate('Search')}
+      />
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
         <View style={styles.bannerWrap}>

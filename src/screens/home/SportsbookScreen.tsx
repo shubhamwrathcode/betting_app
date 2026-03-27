@@ -1,7 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native'
 import { useNavigation } from '@react-navigation/native'
-import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { WebView } from 'react-native-webview'
 import { LandingHeader } from '../../components/common/LandingHeader'
 import { AppFonts } from '../../components/AppFonts'
@@ -10,7 +9,6 @@ import { apiClient } from '../../api/client'
 
 const SportsbookScreen = () => {
   const navigation = useNavigation<any>()
-  const insets = useSafeAreaInsets()
   const { isAuthenticated } = useAuth()
   const launchCalledRef = useRef(false)
   const [launchURL, setLaunchURL] = useState<string | null>(null)
@@ -53,14 +51,12 @@ const SportsbookScreen = () => {
   }, [isAuthenticated])
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top }]}>
-      {!isAuthenticated ? (
-        <LandingHeader
-          onLoginPress={() => navigation.navigate('Login', { initialTab: 'login' })}
-          onSignupPress={() => navigation.navigate('Login', { initialTab: 'signup' })}
-          onSearchPress={() => navigation.navigate('Search')}
-        />
-      ) : null}
+    <View style={styles.container}>
+      <LandingHeader
+        onLoginPress={() => navigation.navigate('Login', { initialTab: 'login' })}
+        onSignupPress={() => navigation.navigate('Login', { initialTab: 'signup' })}
+        onSearchPress={() => navigation.navigate('Search')}
+      />
 
       {loading ? (
         <View style={styles.centerState}>
@@ -72,9 +68,9 @@ const SportsbookScreen = () => {
       {!loading && error ? (
         <View style={styles.centerState}>
           <Text style={styles.errorText}>{error}</Text>
-          <Pressable style={styles.backBtn} onPress={() => navigation.navigate('MainTabs', { screen: 'Home' })}>
+          {/* <Pressable style={styles.backBtn} onPress={() => navigation.navigate('MainTabs', { screen: 'Home' })}>
             <Text style={styles.backBtnText}>Back to Home</Text>
-          </Pressable>
+          </Pressable> */}
         </View>
       ) : null}
 

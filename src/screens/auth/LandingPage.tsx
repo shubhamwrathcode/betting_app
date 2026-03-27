@@ -60,6 +60,7 @@ import CasinoVector from '../../../assets/AppImages/casino_vector.svg'
 import SportVector from '../../../assets/AppImages/sport_vector.svg'
 import LinearGradient from 'react-native-linear-gradient'
 import Video, { ResizeMode } from 'react-native-video'
+import FastImage from 'react-native-fast-image'
 import { LandingFooter } from '../../components/common/LandingFooter'
 
 type LandingPageProps = {
@@ -146,12 +147,24 @@ const getLandingGameImage = (item: LandingGame) =>
 const toAbsoluteImageUrl = (rawUrl: string) => {
   const src = rawUrl.trim()
   if (!src) return ''
-  if (src.startsWith('http://') || src.startsWith('https://')) return src
-  if (src.startsWith('//')) return `https:${src}`
-  if (src.startsWith('/')) return `${API_BASE_URL}${src}`
-  return `${API_BASE_URL}/${src}`
+  let resolvedUrl = ''
+  if (src.startsWith('http://')) resolvedUrl = src.replace(/^http:\/\//i, 'https://')
+  else if (src.startsWith('https://')) resolvedUrl = src
+  else if (src.startsWith('//')) resolvedUrl = `https:${src}`
+  else if (src.startsWith('/')) resolvedUrl = `${API_BASE_URL}${src}`
+  else resolvedUrl = `${API_BASE_URL}/${src}`
+
+  return resolvedUrl
 }
 
+// const toAbsoluteImageUrl = (rawUrl: string) => {
+//   const src = rawUrl.trim()
+//   if (!src) return ''
+//   if (src.startsWith('http://') || src.startsWith('https://')) return src
+//   if (src.startsWith('//')) return `https:${src}`
+//   if (src.startsWith('/')) return `${API_BASE_URL}${src}`
+//   return `${API_BASE_URL}/${src}`
+// }
 const formatMatchTime = (input: unknown) => {
   if (typeof input !== 'string' || !input) return 'Today\n--:--'
   const d = new Date(input)
@@ -257,6 +270,7 @@ export const LandingPage = ({ onOpenLogin, onOpenSignup, onOpenHome, navigation:
   const finalNav = propsNav || navigation
 
   const [launchingGame, setLaunchingGame] = useState(false)
+  const [failedThumbs, setFailedThumbs] = useState<Set<string>>(new Set())
 
   const handleLaunchGame = async (game: any) => {
     if (!isAuthenticated) {
@@ -576,6 +590,9 @@ export const LandingPage = ({ onOpenLogin, onOpenSignup, onOpenHome, navigation:
       }
 
       const imgUrl = getLandingGameImage(game)
+      const thumbKey = String((game as any).gameCode || (game as any).code || idx)
+      const absoluteImgUrl = toAbsoluteImageUrl(imgUrl)
+      const showRemoteImage = absoluteImgUrl.length > 0 && !failedThumbs.has(thumbKey)
       return (
         <TouchableOpacity
           key={idx}
@@ -583,13 +600,26 @@ export const LandingPage = ({ onOpenLogin, onOpenSignup, onOpenHome, navigation:
           onPress={() => handleLaunchGame(game)}
           activeOpacity={0.8}
         >
-          {imgUrl ? (
-            <Image
-              source={{ uri: toAbsoluteImageUrl(imgUrl) }}
+          {showRemoteImage ? (
+            <FastImage
+              source={{
+                uri: absoluteImgUrl,
+                priority: FastImage.priority.normal,
+                cache: FastImage.cacheControl.web,
+              }}
               style={styles.gameCardImage}
-              resizeMode="cover"
+              resizeMode={FastImage.resizeMode.cover}
+              onError={() =>
+                setFailedThumbs(prev => {
+                  const next = new Set(prev)
+                  next.add(thumbKey)
+                  return next
+                })
+              }
             />
-          ) : null}
+          ) : (
+            <Image source={ImageAssets.gameItemsliderPng} style={styles.gameCardImage} resizeMode="cover" />
+          )}
         </TouchableOpacity>
       )
     }

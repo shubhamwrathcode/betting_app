@@ -232,6 +232,7 @@ export const ImageAssets = {
   calendar: require('../../assets/AppImages/calendar.png'),
   download: require('../../assets/AppImages/download.png'),
   indiaflag: require('../../assets/AppImages/indiaflag.png'),
+  bin: require('../../assets/AppImages/bin.png'),
 
 
 
@@ -239,7 +240,7 @@ export const ImageAssets = {
 
 
 
-  
+
   
   
 

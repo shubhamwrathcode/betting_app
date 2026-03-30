@@ -216,7 +216,12 @@ const WithdrawalScreen = () => {
         {loading ? (
           <Text style={styles.emptyText}>Loading bank accounts...</Text>
         ) : accounts.length === 0 ? (
-          <View style={styles.block}><Text style={styles.emptyText}>No bank account added yet. Add one to request withdrawal.</Text></View>
+          <View style={styles.block}>
+            <Text style={styles.emptyText}>No bank account added yet. Add one to request withdrawal.</Text>
+            <Pressable style={styles.addBankLink} onPress={() => navigation.navigate('AddAccount')}>
+              <Text style={styles.addBankLinkText}>Add bank account</Text>
+            </Pressable>
+          </View>
         ) : (
           <View style={styles.block}>
             <Text style={styles.blockHeading}>Your bank account</Text>
@@ -292,6 +297,17 @@ const styles = StyleSheet.create({
   submitBtnText: { color: '#fff', fontFamily: AppFonts.montserratBold, fontSize: 16 / 1.2 },
   disabledBtn: { opacity: 0.6 },
   emptyText: { color: 'rgba(255,255,255,0.6)', fontFamily: AppFonts.montserratMedium, fontSize: 14 },
+  addBankLink: {
+    marginTop: 14,
+    alignSelf: 'flex-start',
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: '#C45F24',
+    backgroundColor: '#D56E2A',
+  },
+  addBankLinkText: { color: '#fff', fontFamily: AppFonts.montserratSemiBold, fontSize: 13 },
 })
 
 export default WithdrawalScreen

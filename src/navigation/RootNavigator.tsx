@@ -25,6 +25,7 @@ import SupportScreen from '../screens/home/SupportScreen'
 import DepositScreen from '../screens/home/DepositScreen'
 import WithdrawalScreen from '../screens/home/WithdrawalScreen'
 import MyProfileScreen from '../screens/home/MyProfileScreen'
+import AddAccountScreen from '../screens/home/AddAccountScreen'
 import MenuScreen from '../screens/home/MenuScreen'
 import { BottomTab } from '../components/common/BottomTab'
 import { View, ActivityIndicator } from 'react-native'
@@ -37,6 +38,7 @@ type RootStackParamList = {
   Game: { url: string; title: string }
   Search: undefined
   MyProfile: undefined
+  AddAccount: undefined
   AuthenticatedHome: undefined
 }
 
@@ -135,6 +137,7 @@ export const RootNavigator = () => {
         }}
       />
       <Stack.Screen name="MyProfile" component={MyProfileScreen} />
+      <Stack.Screen name="AddAccount" component={AddAccountScreen} />
     </Stack.Navigator>
   )
 }

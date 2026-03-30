@@ -37,8 +37,10 @@ export const API_ENDPOINTS = {
   walletGenerateAddress: '/api/v1/wallet/generate-address',
   walletVerifyUsdtDeposit: '/api/v1/wallet/verify-usdt-deposit',
 
-  // Bank accounts
+  // Bank accounts (POST add, GET list, DELETE /:id, PATCH /:id/default)
   bankAccounts: '/api/v1/bank-accounts',
+  /** POST — same as web AuthService.bettingBankAccountsSendOtp */
+  bankAccountsSendOtp: '/api/v1/auth/send-otp-bank',
 
   /** GET /api/v1/account/statement – same as web getAccountStatementFromAccount */
   accountStatement: '/api/v1/account/statement',

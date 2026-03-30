@@ -147,6 +147,16 @@ const MenuScreen = ({ navigation }: any) => {
     navigation.navigate('Tabs', { screen: 'Withdrawal', params: { returnToTab } })
   }
 
+  const openAddAccount = () => {
+    if (!isAuthenticated) {
+      navigation.closeDrawer()
+      navigation.navigate('Login', { initialTab: 'login' })
+      return
+    }
+    navigation.closeDrawer()
+    navigation.navigate('AddAccount')
+  }
+
   const allMenuItems: (MenuItem & { authOnly?: boolean })[] = [
     { key: 'casino', label: 'Casino', icon: ImageAssets.spade, onPress: () => goToTab('Casino') },
     { key: 'inplay', label: 'InPlay', icon: ImageAssets.gamepad, onPress: () => goToTab('InPlay') },
@@ -159,6 +169,7 @@ const MenuScreen = ({ navigation }: any) => {
     { key: 'bethistory', label: 'Bet History', icon: ImageAssets.bethistory, onPress: openBetHistory, authOnly: true },
     { key: 'gamehistory', label: 'Game History', icon: ImageAssets.gamepad, onPress: openGameHistory, authOnly: true },
     { key: 'wallet', label: 'My Wallet', icon: ImageAssets.walletfill, onPress: openMyWallet, authOnly: true },
+    { key: 'bankaccounts', label: 'Bank accounts', icon: ImageAssets.bankfill, onPress: openAddAccount, authOnly: true },
     { key: 'pl', label: 'Betting P&L', icon: ImageAssets.linechart, onPress: openBettingProfitLoss, authOnly: true },
     { key: 'statement', label: 'Account Statement', icon: ImageAssets.bankfill, onPress: openAccountStatement, authOnly: true },
     { key: 'support', label: 'Live Support', icon: ImageAssets.customerSupport, onPress: openSupport, authOnly: true },

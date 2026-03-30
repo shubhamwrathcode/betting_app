@@ -104,7 +104,7 @@ export const LandingHeader = ({
                 <Pressable style={styles.dropdownItem} onPress={() => { setProfileOpen(false); navigation.navigate('MyProfile') }}>
                   <Text style={styles.dropdownItemText}>My Profile</Text>
                 </Pressable>
-                <Pressable style={styles.dropdownItem} onPress={() => { setProfileOpen(false); navigation.navigate('Tabs', { screen: 'AccountStatement' }) }}>
+                <Pressable style={styles.dropdownItem} onPress={() => { setProfileOpen(false); navigation.navigate('AddAccount') }}>
                   <Text style={styles.dropdownItemText}>Account</Text>
                 </Pressable>
                 <Pressable style={styles.dropdownItem} onPress={() => { setProfileOpen(false); navigation.navigate('Tabs', { screen: 'Transactions' }) }}>

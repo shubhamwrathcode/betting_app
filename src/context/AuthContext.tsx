@@ -8,6 +8,8 @@ type UserData = {
   mobile?: string
   fullName?: string
   email?: string
+  profileImage?: string
+  updatedAt?: string
   wallet?: {
     balance: number
   }
@@ -18,6 +20,8 @@ type AuthContextValue = {
   user: UserData | null
   login: (userData: any, token: string) => Promise<void>
   logout: () => Promise<void>
+  /** Merge into current user and persist (e.g. after profile update). */
+  updateUser: (partial: Partial<UserData>) => Promise<void>
   loading: boolean
 }
 
@@ -79,6 +83,21 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
         } catch (err) {
           console.warn('Storage cleanup failed')
         }
+      },
+      updateUser: async (partial: Partial<UserData>) => {
+        try {
+          const stored = await AsyncStorage.getItem('user_auth')
+          if (stored) {
+            const parsed = JSON.parse(stored)
+            const nextUser = { ...(parsed.user || {}), ...partial } as UserData
+            await AsyncStorage.setItem('user_auth', JSON.stringify({ ...parsed, user: nextUser }))
+            setUser(nextUser)
+            return
+          }
+        } catch {
+          console.warn('updateUser persistence failed')
+        }
+        setUser(prev => ({ ...(prev || {}), ...partial } as UserData))
       },
     }),
     [isAuthenticated, user, loading],

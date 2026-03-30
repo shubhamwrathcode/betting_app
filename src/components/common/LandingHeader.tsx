@@ -61,6 +61,11 @@ export const LandingHeader = ({
       <>
         <View style={[styles.topBar, { paddingTop: insets.top + 8 }]}>
           <View style={styles.leftCluster}>
+            {/* {onBackPress ? (
+              <Pressable onPress={onBackPress} style={styles.backBtn} hitSlop={10} accessibilityRole="button">
+                <Text style={styles.backChevron}>‹</Text>
+              </Pressable>
+            ) : null} */}
             <Image source={ImageAssets.logoPng} style={styles.logoAuth} resizeMode="contain" />
           </View>
 
@@ -96,7 +101,7 @@ export const LandingHeader = ({
                   <Image source={ImageAssets.userVectorPng} style={styles.dropdownUserImg} resizeMode="cover" />
                   <Text style={styles.dropdownUserName}>{displayName}</Text>
                 </View>
-                <Pressable style={styles.dropdownItem} onPress={() => { setProfileOpen(false); navigation.navigate('Tabs', { screen: 'ReferralRewards' }) }}>
+                <Pressable style={styles.dropdownItem} onPress={() => { setProfileOpen(false); navigation.navigate('MyProfile') }}>
                   <Text style={styles.dropdownItemText}>My Profile</Text>
                 </Pressable>
                 <Pressable style={styles.dropdownItem} onPress={() => { setProfileOpen(false); navigation.navigate('Tabs', { screen: 'AccountStatement' }) }}>

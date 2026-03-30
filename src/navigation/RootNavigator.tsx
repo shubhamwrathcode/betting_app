@@ -24,6 +24,7 @@ import AccountStatementScreen from '../screens/home/AccountStatementScreen'
 import SupportScreen from '../screens/home/SupportScreen'
 import DepositScreen from '../screens/home/DepositScreen'
 import WithdrawalScreen from '../screens/home/WithdrawalScreen'
+import MyProfileScreen from '../screens/home/MyProfileScreen'
 import MenuScreen from '../screens/home/MenuScreen'
 import { BottomTab } from '../components/common/BottomTab'
 import { View, ActivityIndicator } from 'react-native'
@@ -35,6 +36,7 @@ type RootStackParamList = {
   ForgotPassword: undefined
   Game: { url: string; title: string }
   Search: undefined
+  MyProfile: undefined
   AuthenticatedHome: undefined
 }
 
@@ -132,6 +134,7 @@ export const RootNavigator = () => {
           ...TransitionPresets.ModalSlideFromBottomIOS,
         }}
       />
+      <Stack.Screen name="MyProfile" component={MyProfileScreen} />
     </Stack.Navigator>
   )
 }

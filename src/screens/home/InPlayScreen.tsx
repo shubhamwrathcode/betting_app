@@ -377,13 +377,14 @@ const InPlayScreen = () => {
   }, [activeTab, sportsFilter, cricketMatches, tennisMatches, soccerMatches])
 
   const onOpenSportsbookMatch = (match: MatchItem) => {
-    navigation.navigate('MainTabs', {
-      screen: 'SportsBook',
-      params: {
-        eventId: match.eventId,
-        gameId: match.gameId,
-      },
-    })
+    const sportNav = activeTab === 'soccer' ? 'soccer' : activeTab
+    navigation.navigate('MatchDetail' as never, {
+      sportName: sportNav,
+      gameId: match.gameId,
+      eventId: match.eventId,
+      eventName: match.eventName ?? match.event_name ?? match.name,
+      seriesName: match.seriesName ?? match.series_name,
+    } as never)
   }
 
   const showVol = (sz: unknown) => sz != null && sz !== '—' && String(sz).trim() !== '' && String(sz) !== '0.00'

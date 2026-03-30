@@ -64,6 +64,9 @@ export const API_ENDPOINTS = {
   sportsbookBetHistory: '/api/v1/sportsbook/bet/history',
   sportsbookBetCancel: '/api/v1/sportsbook/bet',
   sportsbookProfitLoss: '/api/v1/sportsbook/profit-loss',
+  /** GET query: eventId — public; min/max stake, tvUrl, etc. */
+  sportsbookEventConfig: '/api/v1/sportsbook/event/config',
+  sportsbookPlaceBet: '/api/v1/sportsbook/place-bet',
 
   // Support
   supportTickets: '/api/v1/support/tickets',

@@ -163,6 +163,52 @@ export function addMatchDataListener(fn: MatchDataListener): () => void {
   return () => listeners.delete(fn)
 }
 
+/**
+ * Subscribe to full match odds for one event (ref-counted). Same contract as web `subscribeMatchDataDetail`.
+ */
+export function subscribeMatchDataDetail(sportName: string, gameId: string | number) {
+  const s = String(sportName || '')
+    .trim()
+    .toLowerCase()
+  const id = gameId != null && String(gameId).trim() !== '' ? String(gameId).trim() : ''
+  if (!s || !id) return
+  const key = `${s}:${id}`
+  const prev = matchDetailSubRefCounts.get(key) || 0
+  matchDetailSubRefCounts.set(key, prev + 1)
+  ensureSocket()
+  if (prev === 0 && socket?.connected) {
+    socket.emit('matchData:subscribeMatch', { sportName: s, gameId: id })
+  }
+}
+
+export function unsubscribeMatchDataDetail(sportName: string, gameId: string | number) {
+  const s = String(sportName || '')
+    .trim()
+    .toLowerCase()
+  const id = gameId != null && String(gameId).trim() !== '' ? String(gameId).trim() : ''
+  if (!s || !id) return
+  const key = `${s}:${id}`
+  const prev = matchDetailSubRefCounts.get(key) || 0
+  const next = Math.max(0, prev - 1)
+  if (next === 0) {
+    matchDetailSubRefCounts.delete(key)
+    if (socket?.connected) {
+      socket.emit('matchData:unsubscribeMatch', { sportName: s, gameId: id })
+    }
+  } else {
+    matchDetailSubRefCounts.set(key, next)
+  }
+}
+
+export function addMatchDataDetailListener(fn: (payload: unknown) => void): () => void {
+  matchDetailListeners.add(fn)
+  return () => matchDetailListeners.delete(fn)
+}
+
+export function removeMatchDataDetailListener(fn: (payload: unknown) => void): void {
+  matchDetailListeners.delete(fn)
+}
+
 export function normalizeMatchDataUpdatePayload(payload: unknown): {
   sportName: string | null
   timestamp: number | null

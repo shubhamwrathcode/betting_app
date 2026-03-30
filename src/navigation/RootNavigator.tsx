@@ -27,6 +27,7 @@ import WithdrawalScreen from '../screens/home/WithdrawalScreen'
 import MyProfileScreen from '../screens/home/MyProfileScreen'
 import AddAccountScreen from '../screens/home/AddAccountScreen'
 import MenuScreen from '../screens/home/MenuScreen'
+import MatchDetailScreen from '../screens/home/MatchDetailScreen'
 import { BottomTab } from '../components/common/BottomTab'
 import { View, ActivityIndicator } from 'react-native'
 import { useAuth } from '../hooks/useAuth'
@@ -40,6 +41,13 @@ type RootStackParamList = {
   MyProfile: undefined
   AddAccount: undefined
   AuthenticatedHome: undefined
+  MatchDetail: {
+    sportName?: string
+    gameId?: string
+    eventId?: string
+    eventName?: string
+    seriesName?: string
+  }
 }
 
 const Tab = createBottomTabNavigator()
@@ -138,6 +146,7 @@ export const RootNavigator = () => {
       />
       <Stack.Screen name="MyProfile" component={MyProfileScreen} />
       <Stack.Screen name="AddAccount" component={AddAccountScreen} />
+      <Stack.Screen name="MatchDetail" component={MatchDetailScreen} />
     </Stack.Navigator>
   )
 }

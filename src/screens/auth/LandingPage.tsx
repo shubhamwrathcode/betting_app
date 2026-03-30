@@ -716,6 +716,16 @@ export const LandingPage = ({ onOpenLogin, onOpenSignup, onOpenHome, navigation:
     const innerW = winW
     const leftClusterW = Math.min(270, Math.round(innerW * 0.58))
 
+    const openMatchDetail = (row: SportsbookMatch) => {
+      finalNav.navigate('MatchDetail' as never, {
+        sportName: sportKey,
+        gameId: row.gameId ?? row.game_id,
+        eventId: row.eventId ?? row.event_id,
+        eventName: row.eventName ?? row.event_name ?? row.name,
+        seriesName: row.seriesName ?? row.series_name,
+      } as never)
+    }
+
     const showVol = (sz: unknown) =>
       sz != null && sz !== '—' && String(sz).trim() !== '' && String(sz) !== '0.00'
 
@@ -817,7 +827,11 @@ export const LandingPage = ({ onOpenLogin, onOpenSignup, onOpenHome, navigation:
                     {rowsSorted.map(({ row, eventTime, rowKey }) => {
                       const pills = marketPillCodesForRow(row)
                       return (
-                        <View key={rowKey} style={[styles.matchRow, { minHeight: LANDING_ROW_H }]}>
+                        <Pressable
+                          key={rowKey}
+                          style={[styles.matchRow, { minHeight: LANDING_ROW_H }]}
+                          onPress={() => openMatchDetail(row)}
+                        >
                           <View style={[styles.matchRowLeft, { width: leftClusterW, flexShrink: 0 }]}>
                             <View style={styles.matchMeta}>
                               {row.inPlay ?? (row as any).in_play ? <Text style={styles.liveTag}>LIVE</Text> : null}
@@ -857,7 +871,7 @@ export const LandingPage = ({ onOpenLogin, onOpenSignup, onOpenHome, navigation:
                               })()}
                             </View>
                           </View>
-                        </View>
+                        </Pressable>
                       )
                     })}
                   </View>
@@ -871,8 +885,12 @@ export const LandingPage = ({ onOpenLogin, onOpenSignup, onOpenHome, navigation:
                     contentContainerStyle={[styles.oddsOnlyHScrollInner, { width: stripPx }]}
                   >
                     <View style={styles.oddsOnlyCol}>
-                      {rowsSorted.map(({ stripCols, rowKey }) => (
-                        <View key={`${rowKey}-odds`} style={[styles.oddsRow, { minHeight: LANDING_ROW_H }]}>
+                      {rowsSorted.map(({ row, stripCols, rowKey }) => (
+                        <Pressable
+                          key={`${rowKey}-odds`}
+                          style={[styles.oddsRow, { minHeight: LANDING_ROW_H }]}
+                          onPress={() => openMatchDetail(row)}
+                        >
                           <View style={styles.oddsStripRowHorizontal}>
                             {Array.from({ length: maxCols }, (_, i) =>
                               renderStripCell(`${rowKey}-b-${i}`, stripCols[i] ?? null, 'back', false),
@@ -886,7 +904,7 @@ export const LandingPage = ({ onOpenLogin, onOpenSignup, onOpenHome, navigation:
                               ),
                             )}
                           </View>
-                        </View>
+                        </Pressable>
                       ))}
                     </View>
                   </ScrollView>

@@ -39,6 +39,14 @@ const getAuthHeader = async (config: RequestConfig): Promise<Record<string, stri
   return {}
 }
 
+/** JSON requests: Content-Type + optional Bearer (same rules as {@link apiClient}). */
+export async function buildJsonRequestHeaders(
+  opts: Pick<RequestConfig, 'skipAuth' | 'token'> = {},
+): Promise<Record<string, string>> {
+  const auth = await getAuthHeader({ skipAuth: opts.skipAuth, token: opts.token })
+  return { 'Content-Type': 'application/json', ...auth }
+}
+
 // Global method to set token from AuthContext
 export const setMemoryToken = (token: string | null) => {
   memoryToken = token

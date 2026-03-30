@@ -233,9 +233,11 @@ export const ImageAssets = {
   download: require('../../assets/AppImages/download.png'),
   indiaflag: require('../../assets/AppImages/indiaflag.png'),
   bin: require('../../assets/AppImages/bin.png'),
+  backImg: require('../../assets/AppImages/backImg.png'),
 
 
 
+  
 
 
 

@@ -15,21 +15,34 @@ import { LandingHeader } from '../../components/common/LandingHeader'
 import { useAuth } from '../../hooks/useAuth'
 import { AppFonts } from '../../components/AppFonts'
 import { ImageAssets } from '../../components/ImageAssets'
-import { API_ENDPOINTS } from '../../api/endpoints'
-import { apiClient } from '../../api/client'
 import CricketIcon from '../../../assets/AppImages/menu-icon19.svg'
 import TennisIcon from '../../../assets/AppImages/menu-icon20.svg'
 import SportsbookIcon from '../../../assets/AppImages/sports_icon.svg'
+import { sportsbookService } from '../../services/sportsbookService'
+import {
+  computeTop1x2Cells,
+  getLandingOddsStripColumns,
+  landingOddsValid,
+  type LandingOddsPairColumn,
+} from '../../utils/sportsGameOdds'
+import {
+  addMatchDataListener,
+  normalizeMatchDataUpdatePayload,
+  subscribeMatchDataLandingAll,
+  unsubscribeMatchDataLandingAll,
+} from '../../socket/matchDataSocket'
+import { normalizeMatchDataEventTime, pickMatchEventTime } from '../../utils/matchDataNormalize'
 
 type SportTab = 'cricket' | 'tennis' | 'soccer'
 type TabId = SportTab | 'sportsbook'
-type SportsFilter = 'all' | 'live' | 'virtual' | 'premium'
+type SportsFilter = '' | 'live' | 'virtual' | 'premium'
 type MatchItem = {
   eventId?: string
   gameId?: string
   eventName?: string
   event_name?: string
   name?: string
+  teams?: string
   eventTime?: string
   event_time?: string
   startTime?: string
@@ -41,9 +54,19 @@ type MatchItem = {
   status?: string
   matchStatus?: string
   selections?: Array<any>
+  matchOdds?: any[]
+  matchOddsResponseDTO?: any[]
+  match_odds?: any[]
+  marketBadges?: any[]
+  markets?: any[]
+  category?: any
+  Category?: any
 }
 
 const BANNERS = [ImageAssets.sportsBnrMobile2Jpg, ImageAssets.sportsBnrMobileJpg, ImageAssets.sportsBnrMobile3Jpg]
+const ODDS_CELL_W = 56
+const LANDING_STRIP_MAX_COLS = 12
+const ROW_H = 76
 
 const TABS: Array<{ id: TabId; label: string; icon: any }> = [
   { id: 'cricket', label: 'Cricket', icon: ImageAssets.menuIcon19Svg },
@@ -53,7 +76,6 @@ const TABS: Array<{ id: TabId; label: string; icon: any }> = [
 ]
 
 const FILTERS: Array<{ id: SportsFilter; label: string }> = [
-  { id: 'all', label: 'All' },
   { id: 'live', label: '+ Live' },
   { id: 'virtual', label: '+ Virtual' },
   { id: 'premium', label: '+ Premium' },
@@ -68,6 +90,31 @@ const isLiveMatch = (m: MatchItem) =>
     (m.matchStatus && String(m.matchStatus).toLowerCase().includes('live'))
   )
 
+const splitEventTitleLines = (raw: unknown) => {
+  const s = String(raw ?? '').trim()
+  if (!s) return { line1: '', line2: '' }
+  const parts = s
+    .split(/\s+(?:vs|v)\s+/i)
+    .map(p => p.trim())
+    .filter(Boolean)
+  if (parts.length >= 2) return { line1: parts[0], line2: parts.slice(1).join(' v ') }
+  const chunks = s.split(/\s{2,}|\n+/).map(x => x.trim()).filter(Boolean)
+  if (chunks.length >= 2) return { line1: chunks[0], line2: chunks.slice(1).join(' ') }
+  return { line1: s, line2: '' }
+}
+
+const marketPillCodesForRow = (row: MatchItem): string[] => {
+  const f: any = (row as any).marketFlags
+  if (!f || typeof f !== 'object') return []
+  const out: string[] = []
+  if (f.MO) out.push('MO')
+  if (f.BM) out.push('BM')
+  if (f.FO) out.push('F')
+  if (f.OM) out.push('OM')
+  if (f.PF) out.push('P')
+  return out
+}
+
 const formatTime = (raw?: string) => {
   if (!raw) return ''
   const d = new Date(raw)
@@ -81,25 +128,118 @@ const formatTime = (raw?: string) => {
   })
 }
 
-const getOddsRows = (match: MatchItem) => {
-  const rows = Array.isArray(match.selections) ? match.selections.slice(0, 3) : []
-  return rows.map(sel => ({
-    name: String(sel?.selectionName || sel?.name || '-'),
-    back: sel?.b1 ?? sel?.back1 ?? sel?.back?.[0]?.price ?? null,
-    lay: sel?.l1 ?? sel?.lay1 ?? sel?.lay?.[0]?.price ?? null,
-  }))
+const formatTimeOnly = (raw?: string) => {
+  if (!raw) return ''
+  const d = new Date(raw)
+  if (Number.isNaN(d.getTime())) return ''
+  return d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true }).toLowerCase()
+}
+
+const getDayGroup = (raw?: string) => {
+  if (!raw) return ''
+  try {
+    const d = new Date(raw)
+    if (Number.isNaN(d.getTime())) return ''
+    const today = new Date()
+    const tomorrow = new Date(today)
+    tomorrow.setDate(tomorrow.getDate() + 1)
+    if (d.toDateString() === today.toDateString()) return 'Today'
+    if (d.toDateString() === tomorrow.toDateString()) return 'Tomorrow'
+    return d.toLocaleDateString('en-IN', { weekday: 'long' })
+  } catch {
+    return ''
+  }
 }
 
 const getRowOdds = (match: MatchItem) => {
-  const rows = getOddsRows(match)
-  const first = rows[0]
-  const second = rows[1]
-  const third = rows[2]
-  return {
-    one: first?.back ?? first?.lay ?? '—',
-    x: second?.back ?? second?.lay ?? '—',
-    two: third?.back ?? third?.lay ?? '—',
+  const matchOdds =
+    (Array.isArray(match.matchOdds) && match.matchOdds) ||
+    (Array.isArray(match.matchOddsResponseDTO) && match.matchOddsResponseDTO) ||
+    (Array.isArray(match.match_odds) && match.match_odds) ||
+    null
+  const cells = computeTop1x2Cells(match, matchOdds ? { matchOdds } : null, landingOddsValid)
+  const pick = (i: number) => {
+    const c = cells[i]
+    if (!c) return '—'
+    const b = c.back?.price
+    const l = c.lay?.price
+    return b != null ? String(b) : l != null ? String(l) : '—'
   }
+  return { one: pick(0), x: pick(1), two: pick(2) }
+}
+
+const hasTag = (match: MatchItem, tag: string) => {
+  const badges = Array.isArray(match?.marketBadges) ? match.marketBadges.join(' ') : ''
+  const mk = Array.isArray(match?.markets)
+    ? match.markets.map((x: any) => `${x?.marketName ?? ''} ${x?.market ?? ''}`).join(' ')
+    : ''
+  const hay = `${badges} ${mk} ${match?.seriesName ?? ''} ${match?.series_name ?? ''} ${match?.eventName ?? ''} ${
+    match?.event_name ?? ''
+  } ${match?.name ?? ''} ${match?.teams ?? ''} ${match?.category ?? ''} ${match?.Category ?? ''}`.toLowerCase()
+  return hay.includes(tag)
+}
+
+const filterList = (list: MatchItem[], mode: SportsFilter) => {
+  if (mode === 'live') return list.filter(isLiveMatch)
+  if (mode === 'virtual') return list.filter(m => hasTag(m, 'virtual'))
+  if (mode === 'premium') return list.filter(m => hasTag(m, 'premium'))
+  return [...list].sort((a, b) => (isLiveMatch(b) ? 1 : 0) - (isLiveMatch(a) ? 1 : 0))
+}
+
+const isPastTodayNonLive = (m: MatchItem, nowMs: number) => {
+  if (isLiveMatch(m)) return false
+  const raw = m.eventTime || m.event_time || m.startTime
+  if (!raw || typeof raw !== 'string') return false
+  const d = new Date(raw)
+  if (Number.isNaN(d.getTime())) return false
+  const today = new Date()
+  if (d.toDateString() !== today.toDateString()) return false
+  return d.getTime() < nowMs
+}
+
+const dayGroupLabel = (isoStr?: string) => {
+  if (!isoStr) return 'Other'
+  try {
+    const d = new Date(isoStr)
+    if (Number.isNaN(d.getTime())) return 'Other'
+    const today = new Date()
+    const tomorrow = new Date(today)
+    tomorrow.setDate(tomorrow.getDate() + 1)
+    if (d.toDateString() === today.toDateString()) return 'Today'
+    if (d.toDateString() === tomorrow.toDateString()) return 'Tomorrow'
+    return d.toLocaleDateString('en-IN', { weekday: 'long' })
+  } catch {
+    return 'Other'
+  }
+}
+
+const sortLiveTodayTomorrow = (list: MatchItem[]) => {
+  const rank = (m: MatchItem) => {
+    if (isLiveMatch(m)) return 0
+    const raw = m.eventTime || m.event_time || m.startTime
+    const g = dayGroupLabel(raw)
+    if (g === 'Today') return 1
+    if (g === 'Tomorrow') return 2
+    return 3
+  }
+  const timeMs = (m: MatchItem) => {
+    const raw = m.eventTime || m.event_time || m.startTime
+    if (!raw || typeof raw !== 'string') return Number.MAX_SAFE_INTEGER
+    const d = new Date(raw)
+    const t = d.getTime()
+    return Number.isNaN(t) ? Number.MAX_SAFE_INTEGER : t
+  }
+  return [...list].sort((a, b) => {
+    const ra = rank(a)
+    const rb = rank(b)
+    if (ra !== rb) return ra - rb
+    const ta = timeMs(a)
+    const tb = timeMs(b)
+    if (ta !== tb) return ta - tb
+    const ka = String(a.eventId ?? a.gameId ?? a.eventName ?? '')
+    const kb = String(b.eventId ?? b.gameId ?? b.eventName ?? '')
+    return ka.localeCompare(kb)
+  })
 }
 
 const renderTabIcon = (id: TabId) => {
@@ -122,12 +262,70 @@ const InPlayScreen = () => {
   const bannerWidth = Math.max(260, Dimensions.get('window').width - 24)
 
   const [activeTab, setActiveTab] = useState<SportTab>('cricket')
-  const [sportsFilter, setSportsFilter] = useState<SportsFilter>('all')
+  const [sportsFilter, setSportsFilter] = useState<SportsFilter>('')
   const [currentSlide, setCurrentSlide] = useState(0)
   const [loading, setLoading] = useState(false)
   const [cricketMatches, setCricketMatches] = useState<MatchItem[]>([])
   const [tennisMatches, setTennisMatches] = useState<MatchItem[]>([])
   const [soccerMatches, setSoccerMatches] = useState<MatchItem[]>([])
+  const [rowHeights, setRowHeights] = useState<Record<string, number>>({})
+
+  useEffect(() => {
+    // Web uses `/matchdata` socket for the Sports Game grid; mirror that in-app.
+    subscribeMatchDataLandingAll()
+    const remove = addMatchDataListener((kind, payload) => {
+      if (kind === 'error') {
+        setLoading(false)
+        return
+      }
+      const { sportName, matches } = normalizeMatchDataUpdatePayload(payload)
+      if (!sportName || !Array.isArray(matches)) return
+      let key = sportName.toLowerCase()
+      // Some deployments emit `football` instead of `soccer`.
+      if (key === 'football') key = 'soccer'
+      if (key !== 'cricket' && key !== 'tennis' && key !== 'soccer') return
+
+      const label = key === 'cricket' ? 'Cricket' : key === 'tennis' ? 'Tennis' : 'Football'
+      const next = (matches as any[])
+        .filter(r => r && typeof r === 'object')
+        .map((r: any) => {
+          const gid = String(r.gameId ?? r.eventId ?? '')
+          const rawTime = pickMatchEventTime(r)
+          const et = rawTime != null ? normalizeMatchDataEventTime(rawTime) : null
+          return {
+            gameId: gid || undefined,
+            eventId: gid || undefined,
+            eventName: r.eventName ?? r.event_name ?? r.name ?? r.teams ?? '—',
+            event_name: r.event_name ?? r.eventName ?? r.name ?? r.teams ?? '—',
+            name: r.name ?? r.eventName ?? r.event_name ?? r.teams ?? '—',
+            teams: typeof r.teams === 'string' ? r.teams : undefined,
+            eventTime: et ?? undefined,
+            event_time: et ?? undefined,
+            inPlay: !!(r.inPlay ?? r.in_play),
+            in_play: !!(r.in_play ?? r.inPlay),
+            seriesName: r.seriesName ?? r.series_name ?? label,
+            series_name: r.series_name ?? r.seriesName ?? label,
+            marketId: r.marketId,
+            matchOdds: Array.isArray(r.matchOdds) ? r.matchOdds : [],
+            marketFlags: { MO: !!r.MO, BM: !!r.BM, OM: !!r.OM, FO: !!r.FO, PF: !!r.PF },
+            marketBadges: r.marketBadges ?? r.market_badges,
+            markets: r.markets,
+            category: r.category ?? r.Category,
+            Category: r.Category ?? r.category,
+          } as MatchItem
+        })
+        .filter((m: any) => (m.eventId || m.gameId) && String(m.eventId || m.gameId).trim() !== '')
+        .slice(0, 50) as MatchItem[]
+      if (key === 'cricket') setCricketMatches(next)
+      else if (key === 'tennis') setTennisMatches(next)
+      else setSoccerMatches(next)
+      setLoading(false)
+    })
+    return () => {
+      remove()
+      unsubscribeMatchDataLandingAll()
+    }
+  }, [])
 
   useEffect(() => {
     const id = setInterval(() => {
@@ -146,14 +344,14 @@ const InPlayScreen = () => {
       setLoading(true)
       try {
         const [c, t, s] = await Promise.all([
-          apiClient<any>(API_ENDPOINTS.sportsbookCricketMatches, { skipAuth: true }),
-          apiClient<any>(API_ENDPOINTS.sportsbookTennisMatches, { skipAuth: true }),
-          apiClient<any>(API_ENDPOINTS.sportsbookSoccerMatches, { skipAuth: true }),
+          sportsbookService.getCricketMatches(),
+          sportsbookService.getTennisMatches(),
+          sportsbookService.getSoccerMatches(),
         ])
         if (!mounted) return
-        setCricketMatches(Array.isArray(c?.data?.matches) ? c.data.matches : Array.isArray(c?.matches) ? c.matches : [])
-        setTennisMatches(Array.isArray(t?.data?.matches) ? t.data.matches : Array.isArray(t?.matches) ? t.matches : [])
-        setSoccerMatches(Array.isArray(s?.data?.matches) ? s.data.matches : Array.isArray(s?.matches) ? s.matches : [])
+        setCricketMatches((c as any[]) as MatchItem[])
+        setTennisMatches((t as any[]) as MatchItem[])
+        setSoccerMatches((s as any[]) as MatchItem[])
       } catch {
         if (!mounted) return
         setCricketMatches([])
@@ -172,8 +370,10 @@ const InPlayScreen = () => {
   const activeMatches = useMemo(() => {
     const list =
       activeTab === 'tennis' ? tennisMatches : activeTab === 'soccer' ? soccerMatches : cricketMatches
-    if (sportsFilter === 'live') return list.filter(isLiveMatch)
-    return list
+    const nowMs = Date.now()
+    const base = filterList(list, sportsFilter)
+    const filtered = base.filter(m => !isPastTodayNonLive(m, nowMs))
+    return sortLiveTodayTomorrow(filtered)
   }, [activeTab, sportsFilter, cricketMatches, tennisMatches, soccerMatches])
 
   const onOpenSportsbookMatch = (match: MatchItem) => {
@@ -184,6 +384,27 @@ const InPlayScreen = () => {
         gameId: match.gameId,
       },
     })
+  }
+
+  const showVol = (sz: unknown) => sz != null && sz !== '—' && String(sz).trim() !== '' && String(sz) !== '0.00'
+
+  const renderStripCell = (key: string, pair: LandingOddsPairColumn, side: 'back' | 'lay', isLast: boolean) => {
+    const raw = pair ? (side === 'back' ? pair.back : pair.lay) : null
+    const sz = pair ? (side === 'back' ? pair.backSize : pair.laySize) : null
+    const ok = raw != null && raw !== '—' && landingOddsValid(raw)
+    const bg = ok ? (side === 'back' ? '#a7d8fd' : '#f9c9d4') : side === 'back' ? '#d4ecfe' : '#fce4ea'
+    return (
+      <View key={key} style={[styles.oddsCell, { width: ODDS_CELL_W, backgroundColor: bg }, isLast && styles.oddsCellLast]}>
+        {ok ? (
+          <>
+            <Text style={styles.oddsPrice}>{String(raw)}</Text>
+            {showVol(sz) ? <Text style={styles.oddsVol}>{String(sz)}</Text> : null}
+          </>
+        ) : (
+          <Text style={styles.oddsDash}>-</Text>
+        )}
+      </View>
+    )
   }
 
   return (
@@ -269,7 +490,7 @@ const InPlayScreen = () => {
               <Pressable
                 key={f.id}
                 style={[styles.filterBtn, sportsFilter === f.id && styles.filterBtnActive]}
-                onPress={() => setSportsFilter(f.id)}
+                onPress={() => setSportsFilter(prev => (prev === f.id ? '' : f.id))}
               >
                 <Text style={[styles.filterText, sportsFilter === f.id && styles.filterTextActive]}>
                   {f.label}
@@ -290,52 +511,111 @@ const InPlayScreen = () => {
           </View>
         ) : (
           <View style={styles.listWrap}>
-            <View style={styles.tableHeader}>
-              <View style={styles.timeColHead} />
-              <View style={styles.matchColHead} />
-              <Text style={styles.head1}>1</Text>
-              <Text style={styles.headX}>X</Text>
-              <Text style={styles.head2}>2</Text>
-            </View>
-            {activeMatches.map((match, idx) => {
-              const odds = getRowOdds(match)
-              const timeRaw = match.eventTime || match.event_time || match.startTime
-              const timeParts = formatTime(timeRaw).split(',')
+            {(() => {
+              const rowsPrep = activeMatches.map((row, idx) => {
+                const eventTime = row.eventTime ?? row.event_time ?? row.startTime
+                const oddsPayload = Array.isArray(row.matchOdds) && row.matchOdds.length > 0 ? { matchOdds: row.matchOdds } : null
+                const stripCols = getLandingOddsStripColumns(
+                  { ...row, teams: row.teams ?? row.eventName ?? row.event_name ?? row.name },
+                  oddsPayload,
+                  LANDING_STRIP_MAX_COLS,
+                )
+                const rowKey = `${activeTab}-${row.eventId ?? row.gameId ?? idx}`
+                return { row, eventTime, stripCols, rowKey }
+              })
+              const maxCols = Math.max(1, ...rowsPrep.map(r => r.stripCols.length))
+              const stripPx = maxCols * ODDS_CELL_W * 2
+              const winW = Dimensions.get('window').width
+              const leftW = Math.min(270, Math.round(winW * 0.58))
               return (
-                <Pressable
-                  key={`${match.eventId || match.gameId || idx}`}
-                  style={styles.rowCard}
-                  onPress={() => onOpenSportsbookMatch(match)}
-                >
-                  <View style={styles.timeCol}>
-                    {isLiveMatch(match) ? <Text style={styles.liveMini}>LIVE</Text> : null}
-                    <Text style={styles.dayText} numberOfLines={1}>
-                      {timeParts[0] || 'Today'}
-                    </Text>
-                    <Text style={styles.clockText} numberOfLines={1}>
-                      {timeParts[1]?.trim() || ''}
-                    </Text>
+                <>
+                  <View style={[styles.matchBlockRow, { width: winW }]}>
+                    <View style={[styles.matchLeftCol, { width: leftW }]}>
+                      {rowsPrep.map(({ row, eventTime, rowKey }) => {
+                        const timeRaw = typeof eventTime === 'string' ? eventTime : undefined
+                        const pills = marketPillCodesForRow(row)
+                        const { line1, line2 } = splitEventTitleLines(row.eventName || row.event_name || row.name || row.teams)
+                        return (
+                          <Pressable
+                            key={rowKey}
+                            style={[styles.matchRow, { minHeight: ROW_H }]}
+                            onPress={() => onOpenSportsbookMatch(row)}
+                            onLayout={e => {
+                              const h = e.nativeEvent.layout.height
+                              setRowHeights(prev => (prev[rowKey] === h ? prev : { ...prev, [rowKey]: h }))
+                            }}
+                          >
+                            <View style={styles.matchMeta}>
+                              {isLiveMatch(row) ? <Text style={styles.liveMini}>LIVE</Text> : null}
+                              <Text style={styles.dayText} numberOfLines={1}>
+                                {getDayGroup(timeRaw) || 'Today'}
+                              </Text>
+                              <Text style={styles.clockText} numberOfLines={1}>
+                                {formatTimeOnly(timeRaw)}
+                              </Text>
+                            </View>
+                            <View style={styles.matchTeamsBox}>
+                              <View style={styles.matchInfoTitleRow}>
+                              
+                                {pills.length > 0 ? (
+                                  <View style={styles.marketPillsRow}>
+                                    {pills.map(p => (
+                                      <View key={p} style={styles.marketPill}>
+                                        <Text style={styles.marketPillText}>{p}</Text>
+                                      </View>
+                                    ))}
+                                  </View>
+                                ) : null}
+                              </View>
+                              <Text style={styles.matchTeamsLine1} numberOfLines={line2 ? 2 : 3}>
+                                {line1 || '—'}
+                              </Text>
+                              {line2 ? (
+                                <Text style={styles.matchTeamsLine2} numberOfLines={2}>
+                                  {line2}
+                                </Text>
+                              ) : null}
+                            </View>
+                          </Pressable>
+                        )
+                      })}
+                    </View>
+
+                    <ScrollView
+                      horizontal
+                      nestedScrollEnabled
+                      keyboardShouldPersistTaps="handled"
+                      showsHorizontalScrollIndicator={false}
+                      style={styles.oddsOnlyHScroll}
+                      contentContainerStyle={[styles.oddsOnlyHScrollInner, { width: stripPx }]}
+                    >
+                      <View style={styles.oddsOnlyCol}>
+                        {rowsPrep.map(({ stripCols, rowKey }) => (
+                          <View
+                            key={`${rowKey}-odds`}
+                            style={[styles.oddsRow, { minHeight: ROW_H, height: rowHeights[rowKey] ?? undefined }]}
+                          >
+                            <View style={styles.oddsStripRowHorizontal}>
+                              {Array.from({ length: maxCols }, (_, i) =>
+                                renderStripCell(`${rowKey}-b-${i}`, stripCols[i] ?? null, 'back', false),
+                              )}
+                              {Array.from({ length: maxCols }, (_, i) =>
+                                renderStripCell(
+                                  `${rowKey}-l-${i}`,
+                                  stripCols[i] ?? null,
+                                  'lay',
+                                  i === maxCols - 1,
+                                ),
+                              )}
+                            </View>
+                          </View>
+                        ))}
+                      </View>
+                    </ScrollView>
                   </View>
-                  <View style={styles.matchCol}>
-                    <Text style={styles.matchSeries} numberOfLines={1}>
-                    {match.seriesName || match.series_name || 'Sportsbook'}
-                    </Text>
-                    <Text style={styles.matchTitle} numberOfLines={2}>
-                      {match.eventName || match.event_name || match.name || 'Match'}
-                    </Text>
-                  </View>
-                  <View style={styles.oddColBlue}>
-                    <Text style={styles.oddValDark}>{odds.one}</Text>
-                  </View>
-                  <View style={styles.oddColPink}>
-                    <Text style={styles.oddValDark}>{odds.x}</Text>
-                  </View>
-                  <View style={styles.oddColBlue}>
-                    <Text style={styles.oddValDark}>{odds.two}</Text>
-                  </View>
-                </Pressable>
+                </>
               )
-            })}
+            })()}
           </View>
         )}
       </ScrollView>
@@ -395,39 +675,51 @@ const styles = StyleSheet.create({
   filterTextActive: { color: '#FFD2A6' },
   centerState: { paddingVertical: 40, alignItems: 'center', gap: 8 },
   stateText: { color: '#9FB0C9', fontFamily: AppFonts.montserratRegular, fontSize: 12 },
-  listWrap: { marginTop: 12 },
-  tableHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderTopWidth: 1,
-    borderWidth: 1,
-    borderColor: '#22324A',
-    backgroundColor: '#09162C',
-    minHeight: 36,
+  listWrap: { marginTop: 12, marginHorizontal: -12 },
+
+  matchBlockRow: { flexDirection: 'row', alignItems: 'flex-start' },
+  matchLeftCol: { flexShrink: 0 },
+  oddsOnlyHScroll: { flex: 1 },
+  oddsOnlyHScrollInner: { flexGrow: 0, paddingRight: 1 },
+  oddsOnlyCol: { flexDirection: 'column' },
+  oddsRow: {
+    backgroundColor: '#0b1620',
+    borderBottomWidth: 0.7,
+    borderBottomColor: '#ffffff',
+    alignItems: 'stretch',
   },
-  timeColHead: { width: 56 },
-  matchColHead: { flex: 1 },
-  head1: { width: 48, textAlign: 'center', color: '#FFFFFF', fontFamily: AppFonts.montserratBold, fontSize: 12 },
-  headX: { width: 48, textAlign: 'center', color: '#FFFFFF', fontFamily: AppFonts.montserratBold, fontSize: 12 },
-  head2: { width: 48, textAlign: 'center', color: '#FFFFFF', fontFamily: AppFonts.montserratBold, fontSize: 12 },
-  rowCard: {
+
+  matchRow: {
     flexDirection: 'row',
     alignItems: 'stretch',
-    minHeight: 62,
-    borderBottomWidth: 1,
-    borderLeftWidth: 1,
-    borderRightWidth: 1,
-    borderColor: '#22324A',
-    backgroundColor: '#0A1324',
+    backgroundColor: '#11161c',
+    borderBottomWidth: 0.7,
+    borderBottomColor: '#ffffff',
   },
-  timeCol: {
-    width: 56,
-    paddingVertical: 4,
+  matchMeta: {
+
+    paddingVertical: 8,
+    paddingHorizontal: 6,
+    justifyContent: 'flex-end',
+    borderRightWidth:0.8,
+    borderRightColor:"white"
+  },
+  matchTeamsBox: { flex: 1, minWidth: 0, paddingVertical: 6, paddingHorizontal: 6, justifyContent: 'flex-end' },
+  matchInfoTitleRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'flex-start', gap: 4, marginBottom: 4 },
+  matchLeague: { color: '#D1D5DB', fontSize: 11, fontFamily: AppFonts.montserratRegular, flex: 1, minWidth: 140 },
+  matchTeamsLine1: { color: '#FFFFFF', fontSize: 11, fontFamily: AppFonts.montserratSemiBold, lineHeight: 16 },
+  matchTeamsLine2: { color: '#FFFFFF', fontSize: 11, fontFamily: AppFonts.montserratSemiBold, lineHeight: 16, marginTop: 2 },
+  marketPillsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 3 },
+  marketPill: {
+    backgroundColor: '#374151',
     paddingHorizontal: 4,
-    borderRightWidth: 1,
-    borderRightColor: '#1C2C42',
-    justifyContent: 'center',
+    paddingVertical: 2,
+    borderRadius: 2,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: '#6B7280',
   },
+  marketPillText: { color: '#F9FAFB', fontSize: 8, fontFamily: AppFonts.montserratSemiBold },
+
   liveMini: {
     backgroundColor: '#E53935',
     color: '#FFF',
@@ -446,26 +738,21 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 2,
   },
-  matchCol: { flex: 1, paddingHorizontal: 8, justifyContent: 'center' },
-  matchSeries: { color: '#D7E2F3', fontFamily: AppFonts.montserratMedium, fontSize: 10, marginBottom: 2 },
-  matchTitle: { color: '#FFFFFF', fontFamily: AppFonts.montserratSemiBold, fontSize: 12, lineHeight: 15 },
-  oddColBlue: {
-    width: 48,
-    borderLeftWidth: 1,
-    borderLeftColor: '#365A79',
-    backgroundColor: '#A8C0D8',
+
+  oddsStripRowHorizontal: { flex: 1, flexDirection: 'row', flexWrap: 'nowrap', alignItems: 'stretch' },
+  oddsCell: {
+    alignSelf: 'stretch',
     justifyContent: 'center',
     alignItems: 'center',
+    paddingVertical: 2,
+    margin: 0,
+    borderRightWidth: 1,
+    borderRightColor: '#ffffff',
   },
-  oddColPink: {
-    width: 48,
-    borderLeftWidth: 1,
-    borderLeftColor: '#7A4D61',
-    backgroundColor: '#D7C1CC',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  oddValDark: { color: '#0F1827', fontFamily: AppFonts.montserratBold, fontSize: 16 / 2 },
+  oddsCellLast: { borderRightWidth: 0 },
+  oddsPrice: { color: '#0f172a', fontSize: 12, fontFamily: AppFonts.montserratExtraBold },
+  oddsVol: { color: '#1e3a5f', fontSize: 9, fontFamily: AppFonts.montserratRegular, marginTop: 2 },
+  oddsDash: { color: '#475569', fontSize: 14, fontFamily: AppFonts.montserratSemiBold },
 })
 
 export default InPlayScreen

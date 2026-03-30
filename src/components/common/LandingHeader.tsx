@@ -56,6 +56,53 @@ export const LandingHeader = ({
     })
   }, [])
 
+  const TAB_SCREEN_NAMES = useMemo(
+    () =>
+      new Set([
+        'Menu',
+        'Casino',
+        'Home',
+        'InPlay',
+        'SportsBook',
+        'GameRules',
+        'Promotions',
+        'ReferralRewards',
+        'Transactions',
+        'MyBets',
+        'BetHistory',
+        'GameHistory',
+        'MyWallet',
+        'BettingProfitLoss',
+        'AccountStatement',
+        'Support',
+        'Deposit',
+        'Withdrawal',
+      ]),
+    [],
+  )
+
+  const deepestFocusedRouteName = useCallback((state: any): string | null => {
+    if (!state?.routes || typeof state.index !== 'number') return null
+    const route = state.routes[state.index]
+    if (route?.state) return deepestFocusedRouteName(route.state) || route.name || null
+    return route?.name ?? null
+  }, [])
+
+  /** Bottom-tab name for `returnToTab` (Transactions / Game History / Withdrawal / Deposit). */
+  const getReturnTabName = useCallback((): string => {
+    try {
+      const root = typeof navigation.getRootState === 'function' ? navigation.getRootState() : navigation.getState()
+      const leaf = deepestFocusedRouteName(root)
+      if (typeof leaf === 'string' && TAB_SCREEN_NAMES.has(leaf)) {
+        if (leaf === 'Menu') return 'Home'
+        return leaf
+      }
+    } catch {
+      // ignore
+    }
+    return 'Home'
+  }, [navigation, deepestFocusedRouteName, TAB_SCREEN_NAMES])
+
   if (isAuthenticated) {
     return (
       <>
@@ -75,7 +122,10 @@ export const LandingHeader = ({
               <Text style={styles.walletText}>{walletLabel}</Text>
             </View>
 
-            <Pressable style={[styles.iconBtn, styles.plusBtn]} onPress={() => navigation.navigate('Tabs', { screen: 'Deposit' })}>
+            <Pressable
+              style={[styles.iconBtn, styles.plusBtn]}
+              onPress={() => navigation.navigate('Deposit', { returnToTab: getReturnTabName() })}
+            >
               <Text style={styles.plusText}>+</Text>
             </Pressable>
 
@@ -107,13 +157,31 @@ export const LandingHeader = ({
                 <Pressable style={styles.dropdownItem} onPress={() => { setProfileOpen(false); navigation.navigate('AddAccount') }}>
                   <Text style={styles.dropdownItemText}>Account</Text>
                 </Pressable>
-                <Pressable style={styles.dropdownItem} onPress={() => { setProfileOpen(false); navigation.navigate('Tabs', { screen: 'Transactions' }) }}>
+                <Pressable
+                  style={styles.dropdownItem}
+                  onPress={() => {
+                    setProfileOpen(false)
+                    navigation.navigate('Transactions', { returnToTab: getReturnTabName() })
+                  }}
+                >
                   <Text style={styles.dropdownItemText}>Transaction History</Text>
                 </Pressable>
-                <Pressable style={styles.dropdownItem} onPress={() => { setProfileOpen(false); navigation.navigate('Tabs', { screen: 'GameHistory' }) }}>
+                <Pressable
+                  style={styles.dropdownItem}
+                  onPress={() => {
+                    setProfileOpen(false)
+                    navigation.navigate('GameHistory', { returnToTab: getReturnTabName() })
+                  }}
+                >
                   <Text style={styles.dropdownItemText}>Game History</Text>
                 </Pressable>
-                <Pressable style={styles.dropdownItem} onPress={() => { setProfileOpen(false); navigation.navigate('Tabs', { screen: 'Withdrawal' }) }}>
+                <Pressable
+                  style={styles.dropdownItem}
+                  onPress={() => {
+                    setProfileOpen(false)
+                    navigation.navigate('Withdrawal', { returnToTab: getReturnTabName() })
+                  }}
+                >
                   <Text style={styles.dropdownItemText}>Withdrawal</Text>
                 </Pressable>
                 <Pressable style={styles.logoutBtn} onPress={() => void handleLogout()}>

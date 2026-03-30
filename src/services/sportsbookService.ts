@@ -8,6 +8,8 @@ export type SportsbookMatch = {
   event_id?: string
   eventName?: string
   event_name?: string
+  /** Some `/matchdata` rows use `teams` like web `match.teams`. */
+  teams?: string
   name?: string
   inPlay?: boolean
   in_play?: boolean
@@ -17,6 +19,10 @@ export type SportsbookMatch = {
   open_date?: string
   seriesName?: string
   series_name?: string
+  /** Redis `/matchdata` rows often carry Match Odds here instead of `selections`. */
+  matchOdds?: unknown[]
+  marketId?: string | null
+  marketFlags?: { MO?: boolean; BM?: boolean; OM?: boolean; FO?: boolean; PF?: boolean }
   selections?: Array<{
     back?: Array<{ price?: number | string; stack?: number | string; open?: boolean }>
     lay?: Array<{ price?: number | string; stack?: number | string; open?: boolean }>

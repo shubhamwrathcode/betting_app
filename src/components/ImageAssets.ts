@@ -37,6 +37,7 @@ export const ImageAssets = {
   casinoGalleryImg5Png: require('../../assets/AppImages/casino_gallery_img5.png'),
   casinoGalleryImg6Png: require('../../assets/AppImages/casino_gallery_img6.png'),
   casinoGalleryImg7Png: require('../../assets/AppImages/casino_gallery_img7.png'),
+  mainLogo: require('../../assets/AppImages/mainLogo.png'),
   casinoIconSvg: require('../../assets/AppImages/casino_icon.svg'),
   casinoLobbyImgWebp: require('../../assets/AppImages/casino_lobby_img.webp'),
   casinoLobbyImg2Webp: require('../../assets/AppImages/casino_lobby_img2.webp'),
@@ -237,14 +238,14 @@ export const ImageAssets = {
 
 
 
-  
 
 
 
 
 
-  
-  
+
+
+
 
 
 

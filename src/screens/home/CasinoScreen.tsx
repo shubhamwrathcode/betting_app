@@ -100,7 +100,8 @@ const CasinoScreen = () => {
   const [providerSearch, setProviderSearch] = useState('')
   const [selectedGameFilter, setSelectedGameFilter] = useState('')
   const [selectedProviderCode, setSelectedProviderCode] = useState('all')
-  const [selectedCategoryCode, setSelectedCategoryCode] = useState('lobby')
+  const [selectedCategoryCode, setSelectedCategoryCode] = useState('FastGames')
+
 
   const [games, setGames] = useState<CasinoGame[]>([])
   const [gamesPage, setGamesPage] = useState(1)
@@ -150,7 +151,7 @@ const CasinoScreen = () => {
       const seen = new Set<string>(['lobby'])
       const all: ProviderCategory[] = [...lobby]
       providers.forEach(p => {
-        ;(p.categories || []).forEach(c => {
+        ; (p.categories || []).forEach(c => {
           const code = String(c?.code || '').trim()
           if (!code || seen.has(code)) return
           seen.add(code)
@@ -461,7 +462,7 @@ const CasinoScreen = () => {
 
       <Modal visible={providerModalOpen} transparent animationType="fade" onRequestClose={() => setProviderModalOpen(false)}>
         <Pressable style={styles.modalBackdrop} onPress={() => setProviderModalOpen(false)}>
-          <Pressable style={styles.modalCard} onPress={() => {}}>
+          <Pressable style={styles.modalCard} onPress={() => { }}>
             <TextInput
               value={providerSearch}
               onChangeText={setProviderSearch}

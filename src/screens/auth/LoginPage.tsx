@@ -59,17 +59,17 @@ export const LoginPage = ({ navigation, route }: LoginPageProps) => {
     try {
       const res = await authService.sendOtp(mobile)
       if (res.status === 'success' || res.success) {
-        Toast.show({ 
-          type: 'success', 
-          text1: 'Success', 
-          text2: res.message || 'OTP sent successfully' 
+        Toast.show({
+          type: 'success',
+          text1: 'Success',
+          text2: res.message || 'OTP sent successfully'
         })
         setOtpSent(true)
       } else {
-        Toast.show({ 
-          type: 'error', 
-          text1: 'Error', 
-          text2: res.message || 'Failed to send OTP' 
+        Toast.show({
+          type: 'error',
+          text1: 'Error',
+          text2: res.message || 'Failed to send OTP'
         })
       }
     } catch (err) {
@@ -81,13 +81,16 @@ export const LoginPage = ({ navigation, route }: LoginPageProps) => {
   const handleAction = async () => {
     if (activeTab === 'login') {
       setLoading(true)
+      console.log('[Auth][Login] Request started for mobile:', mobile);
       try {
         const res = await authService.login({ mobile, password })
+        console.log('[Auth][Login] Response received:', JSON.stringify(res, null, 2));
+
         if (res.status === 'success' || res.success) {
-          Toast.show({ 
-            type: 'success', 
-            text1: 'Welcome', 
-            text2: res.message || 'Login successful' 
+          Toast.show({
+            type: 'success',
+            text1: 'Welcome',
+            text2: res.message || 'Login successful'
           })
           const resAny = res as any
           const userData = resAny.data?.user || resAny.data
@@ -95,14 +98,29 @@ export const LoginPage = ({ navigation, route }: LoginPageProps) => {
           await setAuthenticated(userData, token)
           navigation.replace('MainTabs', { screen: 'Home' })
         } else {
-          Toast.show({ 
-            type: 'error', 
-            text1: 'Login Failed', 
-            text2: res.message || 'Invalid credentials' 
+          console.warn('[Auth][Login] Failed with message:', res.message);
+          Toast.show({
+            type: 'error',
+            text1: 'Login Failed',
+            text2: res.message || 'Invalid credentials'
           })
         }
-      } catch (err) {
-        Toast.show({ type: 'error', text1: 'Error', text2: 'Login failed' })
+      } catch (err: any) {
+        console.error('[Auth][Login] Catch block error:', err);
+        let errorText = 'Login failed';
+        if (err.message) {
+          // Attempt to extract JSON from error string like "API request failed: 401 - {JSON}"
+          const jsonMatch = err.message.match(/\{.*\}/);
+          if (jsonMatch) {
+            try {
+              const parsed = JSON.parse(jsonMatch[0]);
+              errorText = parsed.message || errorText;
+            } catch (e) { errorText = err.message; }
+          } else {
+            errorText = err.message;
+          }
+        }
+        Toast.show({ type: 'error', text1: 'Login Error', text2: errorText })
       }
     } else {
       if (!agreeTerms) {
@@ -110,30 +128,50 @@ export const LoginPage = ({ navigation, route }: LoginPageProps) => {
         return
       }
       setLoading(true)
+      console.log('[Auth][Signup] Request started for mobile:', mobile);
       try {
-        const res = await authService.register({ 
-          mobile, 
-          otp, 
-          password, 
+        const payload = {
+          mobile,
+          otp,
+          password,
           confirmPassword,
-          referralCode 
-        })
+          referralCode
+        };
+        console.log('[Auth][Signup] Sending payload:', JSON.stringify(payload, null, 2));
+        
+        const res = await authService.register(payload)
+        console.log('[Auth][Signup] Response received:', JSON.stringify(res, null, 2));
+
         if (res.status === 'success' || res.success) {
-          Toast.show({ 
-            type: 'success', 
-            text1: 'Account Created', 
-            text2: res.message || 'Registration successful' 
+          Toast.show({
+            type: 'success',
+            text1: 'Account Created',
+            text2: res.message || 'Registration successful'
           })
           setActiveTab('login')
         } else {
-          Toast.show({ 
-            type: 'error', 
-            text1: 'Registration Failed', 
-            text2: res.message || 'Registration failed' 
+          console.warn('[Auth][Signup] Failed with message:', res.message);
+          Toast.show({
+            type: 'error',
+            text1: 'Registration Failed',
+            text2: res.message || 'Registration failed'
           })
         }
-      } catch (err) {
-        Toast.show({ type: 'error', text1: 'Error', text2: 'Registration failed' })
+      } catch (err: any) {
+        console.error('[Auth][Signup] Catch block error:', err);
+        let errorText = 'Registration failed';
+        if (err.message) {
+          const jsonMatch = err.message.match(/\{.*\}/);
+          if (jsonMatch) {
+            try {
+              const parsed = JSON.parse(jsonMatch[0]);
+              errorText = parsed.message || errorText;
+            } catch (e) { errorText = err.message; }
+          } else {
+            errorText = err.message;
+          }
+        }
+        Toast.show({ type: 'error', text1: 'Registration Error', text2: errorText })
       }
     }
     setLoading(false)
@@ -145,10 +183,10 @@ export const LoginPage = ({ navigation, route }: LoginPageProps) => {
     try {
       const res = await authService.demoLogin()
       if (res.status === 'success' || res.success) {
-        Toast.show({ 
-          type: 'success', 
-          text1: 'Demo Access', 
-          text2: res.message || 'Demo Login successful' 
+        Toast.show({
+          type: 'success',
+          text1: 'Demo Access',
+          text2: res.message || 'Demo Login successful'
         })
         const resAny = res as any
         const userData = resAny.data?.user || resAny.data
@@ -156,10 +194,10 @@ export const LoginPage = ({ navigation, route }: LoginPageProps) => {
         await setAuthenticated(userData, token)
         navigation.replace('MainTabs', { screen: 'Home' })
       } else {
-        Toast.show({ 
-          type: 'error', 
-          text1: 'Demo Error', 
-          text2: res.message || 'Demo login failed' 
+        Toast.show({
+          type: 'error',
+          text1: 'Demo Error',
+          text2: res.message || 'Demo login failed'
         })
       }
     } catch (err) {
@@ -190,21 +228,21 @@ export const LoginPage = ({ navigation, route }: LoginPageProps) => {
             </Text>
 
             <View style={styles.tabWrapper}>
-                <TouchableOpacity
-                  onPress={() => setActiveTab('login')}
-                  style={[styles.tab, activeTab === 'login' && styles.activeTab]}
-                  disabled={loading}
-                >
-                  <Text style={[styles.tabText, activeTab === 'login' && styles.activeTabText]}>Log in</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  onPress={() => setActiveTab('signup')}
-                  style={[styles.tab, activeTab === 'signup' && styles.activeTab]}
-                  disabled={loading}
-                >
-                  <Text style={[styles.tabText, activeTab === 'signup' && styles.activeTabText]}>Sign up</Text>
-                </TouchableOpacity>
-              </View>
+              <TouchableOpacity
+                onPress={() => setActiveTab('login')}
+                style={[styles.tab, activeTab === 'login' && styles.activeTab]}
+                disabled={loading}
+              >
+                <Text style={[styles.tabText, activeTab === 'login' && styles.activeTabText]}>Log in</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => setActiveTab('signup')}
+                style={[styles.tab, activeTab === 'signup' && styles.activeTab]}
+                disabled={loading}
+              >
+                <Text style={[styles.tabText, activeTab === 'signup' && styles.activeTabText]}>Sign up</Text>
+              </TouchableOpacity>
+            </View>
 
             <View style={styles.form}>
               {/* Mobile Input Group */}
@@ -310,8 +348,8 @@ export const LoginPage = ({ navigation, route }: LoginPageProps) => {
 
               {/* Terms Agreement (Signup only) */}
               {activeTab === 'signup' && (
-                <TouchableOpacity 
-                  style={styles.checkboxWrapper} 
+                <TouchableOpacity
+                  style={styles.checkboxWrapper}
                   onPress={() => setAgreeTerms(!agreeTerms)}
                   activeOpacity={0.7}
                 >

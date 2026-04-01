@@ -100,7 +100,7 @@ const CasinoScreen = () => {
   const [providerSearch, setProviderSearch] = useState('')
   const [selectedGameFilter, setSelectedGameFilter] = useState('')
   const [selectedProviderCode, setSelectedProviderCode] = useState('all')
-  const [selectedCategoryCode, setSelectedCategoryCode] = useState('FastGames')
+  const [selectedCategoryCode, setSelectedCategoryCode] = useState('lobby')
 
 
   const [games, setGames] = useState<CasinoGame[]>([])
@@ -113,11 +113,20 @@ const CasinoScreen = () => {
   useEffect(() => {
     const selection = route.params?.searchSelection
     if (!selection?.key) return
-    setSelectedProviderCode(selection.providerCode || 'all')
-    setSelectedCategoryCode(selection.categoryCode || 'lobby')
-    setSelectedGameFilter(selection.gameName || '')
+
+    const newProv = selection.providerCode || selection.provider || 'all'
+    const newCat = selection.categoryCode || selection.category || 'lobby'
+    const newGame = selection.gameName || selection.game || ''
+
+    if (newProv !== selectedProviderCode || newCat !== selectedCategoryCode || newGame !== selectedGameFilter) {
+      setSelectedProviderCode(newProv)
+      setSelectedCategoryCode(newCat)
+      setSelectedGameFilter(newGame)
+    }
+    
+    // Clear the params so they don't re-trigger on subsequent focused renders
     navigation.setParams({ searchSelection: undefined })
-  }, [navigation, route.params?.searchSelection])
+  }, [navigation, route.params?.searchSelection, selectedProviderCode, selectedCategoryCode, selectedGameFilter])
 
   useEffect(() => {
     let mounted = true
@@ -151,7 +160,7 @@ const CasinoScreen = () => {
       const seen = new Set<string>(['lobby'])
       const all: ProviderCategory[] = [...lobby]
       providers.forEach(p => {
-        ; (p.categories || []).forEach(c => {
+        ;(p.categories || []).forEach(c => {
           const code = String(c?.code || '').trim()
           if (!code || seen.has(code)) return
           seen.add(code)

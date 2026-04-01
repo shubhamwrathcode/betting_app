@@ -71,13 +71,13 @@ export interface LandingPageProps {
 }
 
 const heroSlides = [
-  { id: 1, image: ImageAssets.homeBnrPng, heading: 'All Mini Games', subContent: 'Play More. Win Faster. Endless Fun Awaits.' },
-  { id: 2, image: ImageAssets.homeBnr2Png, heading: 'Sports & Betting', subContent: 'Play Smart. Bet Big. Win with the Best Odds.' },
-  { id: 3, image: ImageAssets.homeBnr3Png, heading: 'Casino', subContent: 'Play Live. Bet Bold. Win Real Rewards.' },
-  { id: 4, image: ImageAssets.homeBnr4Png, heading: 'Dragon Tiger', subContent: 'Choose Your Side. Bet Fast. Win Instantly.' },
-  { id: 5, image: ImageAssets.homeBnr5Png, heading: 'Aviator', subContent: 'Take Off Early. Cash Out Big. Win Smart.' },
-  { id: 6, image: ImageAssets.homeBnr6Png, heading: 'Cricket', subContent: 'Level up and unlock exclusive perks.' },
-  { id: 7, image: ImageAssets.homeBnr7Png, heading: 'Casino & Sports Hub', subContent: 'Bet Every Ball. Play Every Moment. Win Bigger.' },
+  { id: 1, image: ImageAssets.homeBnrPng, heading: 'All Mini Games', subContent: 'Play More. Win Faster. Endless Fun Awaits.', navigateTo: 'Casino' },
+  { id: 2, image: ImageAssets.homeBnr2Png, heading: 'Sports & Betting', subContent: 'Play Smart. Bet Big. Win with the Best Odds.', navigateTo: 'SportsBook' },
+  { id: 3, image: ImageAssets.homeBnr3Png, heading: 'Casino', subContent: 'Play Live. Bet Bold. Win Real Rewards.', navigateTo: 'Casino' },
+  { id: 4, image: ImageAssets.homeBnr4Png, heading: 'Dragon Tiger', subContent: 'Choose Your Side. Bet Fast. Win Instantly.', navigateTo: 'Casino', params: { searchSelection: { key: 'dt', categoryCode: 'Dragon Tiger' } } },
+  { id: 5, image: ImageAssets.homeBnr5Png, heading: 'Aviator', subContent: 'Take Off Early. Cash Out Big. Win Smart.', action: 'launchGame', gameData: { code: 'aviator', providerCode: 'SPB', name: 'Aviator' } },
+  { id: 6, image: ImageAssets.homeBnr6Png, heading: 'Cricket', subContent: 'Level up and unlock exclusive perks.', navigateTo: 'InPlay' },
+  { id: 7, image: ImageAssets.homeBnr7Png, heading: 'Casino & Sports Hub', subContent: 'Bet Every Ball. Play Every Moment. Win Bigger.', navigateTo: 'Casino' },
 ]
 
 const trendingCategories = [
@@ -280,7 +280,7 @@ const OddsCell = memo(({ side, pair, isLast }: { side: 'back' | 'lay'; pair: Lan
   const nRaw = nPair ? (nSide === 'back' ? nPair.back : nSide === 'lay' ? nPair.lay : null) : null;
   const pSz = pPair ? (pSide === 'back' ? pPair.backSize : pPair.laySize) : null;
   const nSz = nPair ? (nSide === 'back' ? nPair.backSize : nSide === 'lay' ? nPair.laySize : null) : null;
-  
+
   return pRaw === nRaw && pSz === nSz && prev.isLast === next.isLast;
 })
 
@@ -493,15 +493,16 @@ const MatchSection = memo(({ sportKey, navigation }: { sportKey: 'cricket' | 'te
 
 // --- Main Page Component (Static Sections are Memoized) ---
 
-const HeroSlider = memo(({ onTouchStart, onTouchEnd, heroIndex, heroProgress, heroDirection, heroAnimating, runHeroSlide, setHeroIndex }: { 
-  onTouchStart: (e: GestureResponderEvent) => void, 
+const HeroSlider = memo(({ onTouchStart, onTouchEnd, heroIndex, heroProgress, heroDirection, heroAnimating, runHeroSlide, setHeroIndex, onSlidePress }: {
+  onTouchStart: (e: GestureResponderEvent) => void,
   onTouchEnd: (e: GestureResponderEvent) => void,
   heroIndex: number,
   heroProgress: Animated.Value,
   heroDirection: 1 | -1,
   heroAnimating: boolean,
   runHeroSlide: (d: 1 | -1) => void,
-  setHeroIndex: (i: number) => void
+  setHeroIndex: (i: number) => void,
+  onSlidePress: (slide: any) => void
 }) => {
   const dots = useMemo(() => Array.from({ length: heroSlides.length }, (_, i) => i), []);
   return (
@@ -516,14 +517,16 @@ const HeroSlider = memo(({ onTouchStart, onTouchEnd, heroIndex, heroProgress, he
               <Animated.View key={`${slide.id}-${offset}`} style={[styles.hero3dCard, isCenter && styles.heroMainCard,
               offset === -1 ? styles.heroPosLeft1 : offset === 1 ? styles.heroPosRight1 : styles.heroPosCenter
               ]}>
-                <ImageBackground source={slide.image} style={styles.heroCardFill} imageStyle={styles.heroMainCardImage} resizeMode="cover">
-                  {isCenter && (
-                    <View style={styles.heroMainCardOverlay}>
-                      <Text style={styles.heroMainTitle}>{slide.heading}</Text>
-                      <Text style={styles.heroMainSubtitle}>{slide.subContent}</Text>
-                    </View>
-                  )}
-                </ImageBackground>
+                <Pressable style={{ flex: 1 }} onPress={() => isCenter && onSlidePress(slide)}>
+                  <ImageBackground source={slide.image} style={styles.heroCardFill} imageStyle={styles.heroMainCardImage} resizeMode="cover">
+                    {isCenter && (
+                      <View style={styles.heroMainCardOverlay}>
+                        <Text style={styles.heroMainTitle}>{slide.heading}</Text>
+                        <Text style={styles.heroMainSubtitle}>{slide.subContent}</Text>
+                      </View>
+                    )}
+                  </ImageBackground>
+                </Pressable>
               </Animated.View>
             );
           })}
@@ -543,51 +546,101 @@ const HeroSlider = memo(({ onTouchStart, onTouchEnd, heroIndex, heroProgress, he
   );
 });
 
-const QuickActions = memo(({ isAuthenticated, onOpenSignup, onOpenHome, onOpenLogin }: { 
-  isAuthenticated: boolean, 
-  onOpenSignup?: () => void, 
-  onOpenHome?: () => void, 
-  onOpenLogin?: () => void 
+const QuickActions = memo(({ isAuthenticated, onOpenSignup, onOpenHome, onOpenLogin, handleLaunchGame }: {
+  isAuthenticated: boolean,
+  onOpenSignup?: () => void,
+  onOpenHome?: () => void,
+  onOpenLogin?: () => void,
+  handleLaunchGame: (game: any) => void
 }) => {
+  const navigation = useNavigation<any>();
+
   return (
     <>
       <View style={[styles.heroOverlay, { paddingTop: 0 }]}>
         <View style={[styles.heroCtaRow, isAuthenticated && styles.heroCtaRowLoggedIn]}>
-          {!isAuthenticated && <Pressable style={styles.signupBtn} onPress={onOpenSignup}><Text style={styles.signupBtnText}>Sign Up</Text></Pressable>}
+          {!isAuthenticated && <Pressable style={styles.signupBtn} onPress={onOpenSignup}><Text style={styles.signupBtnText}>Sign Up and Play</Text></Pressable>}
           <Pressable style={styles.depositBtn} onPress={isAuthenticated ? onOpenHome : onOpenLogin}><Text style={styles.signupBtnText}>Deposit Now</Text></Pressable>
           <View style={styles.iconGroup}>
-            {[ImageAssets.spade, ImageAssets.football, ImageAssets.dice, ImageAssets.airplane].map((img, i) => (
-              <View key={i} style={styles.smallIcon}><Image source={img} style={styles.smallIconImage} resizeMode="contain" /></View>
+            {[
+              { img: ImageAssets.spade, to: 'Casino' },
+              { img: ImageAssets.football, to: 'InPlay' },
+              { img: ImageAssets.dice, to: 'Casino' },
+              { img: ImageAssets.airplane, action: 'launchAviator' }
+            ].map((item, i) => (
+              <Pressable
+                key={i}
+                style={styles.smallIcon}
+                onPress={() => {
+                  if (item.action === 'launchAviator') {
+                    handleLaunchGame({ code: 'aviator', providerCode: 'SPB', name: 'Aviator' })
+                  } else if (item.to) {
+                    navigation.navigate(item.to)
+                  }
+                }}
+              >
+                <Image source={item.img} style={styles.smallIconImage} resizeMode="contain" />
+              </Pressable>
             ))}
           </View>
         </View>
       </View>
       <View style={styles.quickRow}>
-        <LinearGradient colors={['#9A0C4C', '#0B1A30']} style={styles.quickCard}><Text style={styles.quickTitle}>Casino ›</Text><CasinoVector width={120} height={120} style={styles.quickVector} /></LinearGradient>
-        <LinearGradient colors={['#1D5EA8', '#0B1A30']} style={styles.quickCard}><Text style={styles.quickTitle}>Sport ›</Text><SportVector width={120} height={120} style={styles.quickVector} /></LinearGradient>
+        <Pressable style={{ flex: 1 }} onPress={() => navigation.navigate('Casino')}>
+          <LinearGradient colors={['#9A0C4C', '#0B1A30']} style={styles.quickCard}><Text style={styles.quickTitle}>Casino ›</Text><CasinoVector width={120} height={120} style={styles.quickVector} /></LinearGradient>
+        </Pressable>
+        <Pressable style={{ flex: 1 }} onPress={() => navigation.navigate('InPlay')}>
+          <LinearGradient colors={['#1D5EA8', '#0B1A30']} style={styles.quickCard}><Text style={styles.quickTitle}>Sport ›</Text><SportVector width={120} height={120} style={styles.quickVector} /></LinearGradient>
+        </Pressable>
       </View>
     </>
   );
 });
 
-const TopStrip = memo(({ markVideoFailed, videoFailedSet }: { 
-  markVideoFailed: (name: string) => void, 
-  videoFailedSet: Set<string> 
-}) => (
-  <View style={styles.topStrip}>
-    {trendingCategories.map(cat => (
-      <Pressable key={cat.name} style={styles.stripCard}>
-        {videoFailedSet.has(cat.name) ? (
-          <Image source={cat.image} style={styles.stripCardImage} resizeMode="cover" />
-        ) : (
-          <Video source={cat.video} style={styles.stripCardImage} paused={false} repeat muted resizeMode={ResizeMode.COVER}
-            onError={() => markVideoFailed(cat.name)} />
-        )}
-        <View style={styles.stripTitleBar}><Text style={styles.stripCardTitle}>{cat.name}</Text></View>
-      </Pressable>
-    ))}
-  </View>
-));
+const TopStrip = memo(({ markVideoFailed, videoFailedSet }: {
+  markVideoFailed: (name: string) => void,
+  videoFailedSet: Set<string>
+}) => {
+  const navigation = useNavigation<any>();
+  return (
+    <View style={styles.topStrip}>
+      {trendingCategories.map(cat => {
+        return (
+          <Pressable
+            key={cat.name}
+            style={styles.stripCard}
+            onPress={() => {
+              if (cat.name === 'Aviator') {
+                navigation.navigate('Casino', {
+                  searchSelection: {
+                    key: 'aviator',
+                    provider: 'all',
+                    category: 'Crash Type'
+                  }
+                });
+              } else {
+                navigation.navigate('Casino', {
+                  searchSelection: {
+                    key: cat.name.toLowerCase().replace(/ /g, ''),
+                    category: cat.name
+                  }
+                });
+              }
+            }}
+          >
+            {videoFailedSet.has(cat.name) ? (
+              <Image source={cat.image} style={styles.stripCardImage} resizeMode="cover" />
+            ) : (
+              <Video source={cat.video} style={styles.stripCardImage} paused={false} repeat muted resizeMode={ResizeMode.COVER}
+                onError={() => markVideoFailed(cat.name)} />
+            )}
+            <View style={styles.stripTitleBar}><Text style={styles.stripCardTitle}>{cat.name}</Text></View>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+});
 
 export const LandingPage = ({ onOpenLogin, onOpenSignup, onOpenHome, navigation: propsNav }: LandingPageProps) => {
   const { isAuthenticated } = useAuth()
@@ -613,10 +666,10 @@ export const LandingPage = ({ onOpenLogin, onOpenSignup, onOpenHome, navigation:
     const load = async () => {
       try {
         const [g, l]: any = await Promise.all([landingService.getLandingGames(), landingService.getCasinoLobbyGames(18)])
-        if (mounted) { 
-          if (g) setLandingGames(g); 
-          if (l) setCasinoLobbyGames(l); 
-          setGamesLoading(false); 
+        if (mounted) {
+          if (g) setLandingGames(g);
+          if (l) setCasinoLobbyGames(l);
+          setGamesLoading(false);
         }
       } catch (e) { if (mounted) setGamesLoading(false); }
     }
@@ -685,7 +738,7 @@ export const LandingPage = ({ onOpenLogin, onOpenSignup, onOpenHome, navigation:
       {launchingGame && <View style={styles.globalLoader}><ActivityIndicator size="large" color="#F97316" /></View>}
       <ScrollView showsVerticalScrollIndicator={false} style={styles.scroll}>
         <View style={styles.mainContentArea}>
-          <LandingHeader onLoginPress={onOpenLogin ?? (() => {})} onSignupPress={onOpenSignup ?? (() => {})} />
+          <LandingHeader onLoginPress={onOpenLogin ?? (() => { })} onSignupPress={onOpenSignup ?? (() => { })} />
 
           <HeroSlider onTouchStart={e => setTouchStartX(e.nativeEvent.pageX)}
             onTouchEnd={e => {
@@ -696,13 +749,21 @@ export const LandingPage = ({ onOpenLogin, onOpenSignup, onOpenHome, navigation:
             }}
             heroIndex={heroIndex} heroProgress={heroProgress} heroDirection={heroDirection}
             heroAnimating={heroAnimating} runHeroSlide={runHeroSlide} setHeroIndex={setHeroIndex}
+            onSlidePress={(slide) => {
+              if (slide.action === 'launchGame' && slide.gameData) {
+                handleLaunchGame(slide.gameData)
+              } else if (slide.navigateTo) {
+                finalNav.navigate(slide.navigateTo, slide.params)
+              }
+            }}
           />
 
-          <QuickActions 
-            isAuthenticated={isAuthenticated} 
-            onOpenSignup={onOpenSignup ?? (() => {})} 
-            onOpenHome={onOpenHome ?? (() => {})} 
-            onOpenLogin={onOpenLogin ?? (() => {})} 
+          <QuickActions
+            isAuthenticated={isAuthenticated}
+            onOpenSignup={onOpenSignup ?? (() => { })}
+            onOpenHome={onOpenHome ?? (() => { })}
+            onOpenLogin={onOpenLogin ?? (() => { })}
+            handleLaunchGame={handleLaunchGame}
           />
 
           <TopStrip markVideoFailed={name => setStripVideoFailed(p => new Set(p).add(name))} videoFailedSet={stripVideoFailed} />

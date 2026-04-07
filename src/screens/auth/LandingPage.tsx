@@ -377,6 +377,7 @@ const MatchTeamRow = memo(({ row, eventTime, leftClusterW, onPress }: { row: Spo
     prev.eventTime === next.eventTime &&
     prev.leftClusterW === next.leftClusterW;
 })
+console.log('sd')
 
 const MatchOddsRow = memo(({ row, stripCols, maxCols, rowKey, onPress }: { row: SportsbookMatch, stripCols: LandingOddsPairColumn[], maxCols: number, rowKey: string, onPress: () => void }) => {
   return (
@@ -385,12 +386,14 @@ const MatchOddsRow = memo(({ row, stripCols, maxCols, rowKey, onPress }: { row: 
       onPress={onPress}
     >
       <View style={styles.oddsStripRowHorizontal}>
-        {Array.from({ length: maxCols }, (_, i) => (
-          <OddsCell key={`b-${i}`} side="back" pair={stripCols[i] ?? null} />
-        ))}
-        {Array.from({ length: maxCols }, (_, i) => (
-          <OddsCell key={`l-${i}`} side="lay" pair={stripCols[i] ?? null} isLast={i === maxCols - 1} />
-        ))}
+        {Array.from({ length: maxCols }, (_, i) => {
+          console.log('back mapping i:', i);
+          return <OddsCell key={`b-${i}`} side="back" pair={stripCols[i] ?? null} />;
+        })}
+        {Array.from({ length: maxCols }, (_, i) => {
+          console.log('lay mapping i:', i);
+          return <OddsCell key={`l-${i}`} side="lay" pair={stripCols[i] ?? null} isLast={i === maxCols - 1} />;
+        })}
       </View>
     </Pressable>
   )
@@ -575,14 +578,14 @@ const HeroSlider = memo(({ onTouchStart, onTouchEnd, heroIndex, heroProgress, he
               offset === -1 ? styles.heroPosLeft1 : offset === 1 ? styles.heroPosRight1 : styles.heroPosCenter
               ]}>
                 <Pressable style={{ flex: 1 }} onPress={() => isCenter && onSlidePress(slide)}>
-                  <ImageBackground source={slide.image} style={styles.heroCardFill} imageStyle={styles.heroMainCardImage} resizeMode="cover">
+                  <FastImage source={slide.image} style={styles.heroCardFill} resizeMode={FastImage.resizeMode.cover}>
                     {isCenter && (
                       <View style={styles.heroMainCardOverlay}>
                         <Text style={styles.heroMainTitle}>{slide.heading}</Text>
                         <Text style={styles.heroMainSubtitle}>{slide.subContent}</Text>
                       </View>
                     )}
-                  </ImageBackground>
+                  </FastImage>
                 </Pressable>
               </Animated.View>
             );
@@ -744,7 +747,7 @@ const TopSportsSection = memo(({ navigation }: { navigation: any }) => {
 })
 
 export const LandingPage = ({ onOpenLogin, onOpenSignup, onOpenHome, navigation: propsNav }: LandingPageProps) => {
-  const { isAuthenticated } = useAuth()
+  const { isAuthenticated, user } = useAuth()
   const navigation = useNavigation<any>()
   const finalNav = propsNav || navigation
 
@@ -842,7 +845,25 @@ export const LandingPage = ({ onOpenLogin, onOpenSignup, onOpenHome, navigation:
   useEffect(() => { const t = setInterval(() => runHeroSlide(1), 5000); return () => clearInterval(t); }, [runHeroSlide]);
 
   const handleLaunchGame = useCallback(async (game: any) => {
-    if (!isAuthenticated) { onOpenLogin ? onOpenLogin() : finalNav.navigate('Login'); return; }
+    if (!isAuthenticated) {
+      const gCode = (game.code || game.gameCode || '').toLowerCase();
+      if (gCode === 'aviator') {
+        finalNav.navigate('Casino', {
+          searchSelection: {
+            key: 'aviator',
+            provider: 'all',
+            category: 'Crash Type'
+          }
+        });
+      } else {
+        onOpenLogin ? onOpenLogin() : finalNav.navigate('Login');
+      }
+      return;
+    }
+    const isDemoUser = (user as any)?.role === 'demo' || (user as any)?.isDemo === true
+    if (isDemoUser) {
+      // Allow launch
+    }
     const targetCode = game.code || game.gameCode; if (!targetCode) return;
     setLaunchingGame(true);
     try {
@@ -919,83 +940,121 @@ export const LandingPage = ({ onOpenLogin, onOpenSignup, onOpenHome, navigation:
     );
   }, [handleLaunchGame]);
 
+  const listSections = useMemo(() => {
+    const list: any[] = []
+    if (!gamesLoading) {
+      list.push({
+        type: 'game-sections', data: [
+          { title: 'Trending Games', items: landingGames.trending },
+          { title: 'Roulette', items: landingGames.roulette },
+          { title: 'Card Games', items: landingGames.cardGames },
+          { title: 'Casino Lobby', items: casinoLobbyGames },
+          { title: 'Live Casino', items: landingGames.liveCasino },
+          { title: 'Slots', items: landingGames.slots },
+          { title: 'Chicken Road', items: chickenRoadResolved },
+          { title: 'Crash Games', items: crashGamesResolved },
+        ]
+      })
+    } else {
+      list.push({ type: 'games-loader' })
+    }
+
+    if (!matchesLoading) {
+      list.push({ type: 'match-section', sportKey: 'cricket' })
+      list.push({ type: 'match-section', sportKey: 'tennis' })
+      list.push({ type: 'match-section', sportKey: 'soccer' })
+    } else {
+      list.push({ type: 'matches-loader' })
+    }
+
+    return list
+  }, [gamesLoading, matchesLoading, landingGames, casinoLobbyGames, chickenRoadResolved, crashGamesResolved])
+
+  const renderPageItem = useCallback(({ item }: { item: any }) => {
+    switch (item.type) {
+      case 'game-sections':
+        return <>{item.data.map((s: any) => renderSection(s))}</>
+      case 'games-loader':
+        return <ActivityIndicator style={{ marginTop: 24 }} color={colors.accent} />
+      case 'matches-loader':
+        return (
+          <View style={styles.matchWrapper}>
+            <View style={styles.matchHeader}>
+              <View style={styles.matchHeaderLeft}>
+                <CricketIcon width={22} height={26} fill="#FFFFFF" />
+                <Text style={styles.matchTitle}>Cricket</Text>
+              </View>
+            </View>
+            <View style={{ paddingVertical: 40, alignItems: 'center', justifyContent: 'center' }}>
+              <ActivityIndicator color={colors.accent} size="large" />
+              <Text style={{ color: '#9CA3AF', marginTop: 12, fontSize: 15, fontFamily: AppFonts.montserratSemiBold }}>
+                Loading top matches...
+              </Text>
+            </View>
+          </View>
+        )
+      case 'match-section':
+        return <MatchSection sportKey={item.sportKey} navigation={finalNav} />
+      default:
+        return null
+    }
+  }, [renderSection, finalNav])
+
+  const ListHeader = useMemo(() => (
+    <View style={styles.mainContentArea}>
+      <LandingHeader
+        onLoginPress={onOpenLogin ?? (() => finalNav.navigate('Login'))}
+        onSignupPress={onOpenSignup ?? (() => finalNav.navigate('Login', { initialTab: 'signup' }))}
+        onSearchPress={() => finalNav.navigate('Search')}
+      />
+
+      <HeroSlider onTouchStart={e => setTouchStartX(e.nativeEvent.pageX)}
+        onTouchEnd={e => {
+          if (touchStartX === null) return;
+          const d = e.nativeEvent.pageX - touchStartX;
+          if (d < -40) runHeroSlide(1); else if (d > 40) runHeroSlide(-1);
+          setTouchStartX(null);
+        }}
+        heroIndex={heroIndex} heroProgress={heroProgress} heroDirection={heroDirection}
+        heroAnimating={heroAnimating} runHeroSlide={runHeroSlide} setHeroIndex={setHeroIndex}
+        onSlidePress={(slide) => {
+          if (slide.action === 'launchGame' && slide.gameData) {
+            handleLaunchGame(slide.gameData)
+          } else if (slide.navigateTo) {
+            finalNav.navigate(slide.navigateTo, slide.params)
+          }
+        }}
+      />
+
+      <QuickActions
+        isAuthenticated={isAuthenticated}
+        onOpenSignup={onOpenSignup ?? (() => finalNav.navigate('Login', { initialTab: 'signup' }))}
+        onOpenHome={onOpenHome ?? (() => finalNav.navigate('Login'))}
+        onOpenLogin={onOpenLogin ?? (() => finalNav.navigate('Login'))}
+        handleLaunchGame={handleLaunchGame}
+      />
+
+      <TopStrip markVideoFailed={name => setStripVideoFailed(p => new Set(p).add(name))} videoFailedSet={stripVideoFailed} />
+    </View>
+  ), [finalNav, onOpenLogin, onOpenSignup, touchStartX, runHeroSlide, heroIndex, heroProgress, heroDirection, heroAnimating, handleLaunchGame, isAuthenticated, onOpenHome, stripVideoFailed])
+
+  const ListFooter = useMemo(() => <LandingFooter />, [])
+
   return (
     <View style={styles.page}>
       {launchingGame && <View style={styles.globalLoader}><ActivityIndicator size="large" color="#F97316" /></View>}
-      <ScrollView showsVerticalScrollIndicator={false} style={styles.scroll}>
-        <View style={styles.mainContentArea}>
-          <LandingHeader
-            onLoginPress={onOpenLogin ?? (() => finalNav.navigate('Login'))}
-            onSignupPress={onOpenSignup ?? (() => finalNav.navigate('Login', { initialTab: 'signup' }))}
-            onSearchPress={() => finalNav.navigate('Search')}
-          />
-
-          <HeroSlider onTouchStart={e => setTouchStartX(e.nativeEvent.pageX)}
-            onTouchEnd={e => {
-              if (touchStartX === null) return;
-              const d = e.nativeEvent.pageX - touchStartX;
-              if (d < -40) runHeroSlide(1); else if (d > 40) runHeroSlide(-1);
-              setTouchStartX(null);
-            }}
-            heroIndex={heroIndex} heroProgress={heroProgress} heroDirection={heroDirection}
-            heroAnimating={heroAnimating} runHeroSlide={runHeroSlide} setHeroIndex={setHeroIndex}
-            onSlidePress={(slide) => {
-              if (slide.action === 'launchGame' && slide.gameData) {
-                handleLaunchGame(slide.gameData)
-              } else if (slide.navigateTo) {
-                finalNav.navigate(slide.navigateTo, slide.params)
-              }
-            }}
-          />
-
-          <QuickActions
-            isAuthenticated={isAuthenticated}
-            onOpenSignup={onOpenSignup ?? (() => finalNav.navigate('Login', { initialTab: 'signup' }))}
-            onOpenHome={onOpenHome ?? (() => finalNav.navigate('Login'))}
-            onOpenLogin={onOpenLogin ?? (() => finalNav.navigate('Login'))}
-            handleLaunchGame={handleLaunchGame}
-          />
-
-          <TopStrip markVideoFailed={name => setStripVideoFailed(p => new Set(p).add(name))} videoFailedSet={stripVideoFailed} />
-
-          {/* <TopSportsSection navigation={finalNav} /> */}
-
-          {gamesLoading ? <ActivityIndicator style={{ marginTop: 20 }} color={colors.accent} /> : [
-            { title: 'Trending Games', items: landingGames.trending },
-            { title: 'Roulette', items: landingGames.roulette },
-            { title: 'Card Games', items: landingGames.cardGames },
-            { title: 'Casino Lobby', items: casinoLobbyGames },
-            { title: 'Live Casino', items: landingGames.liveCasino },
-            { title: 'Slots', items: landingGames.slots },
-            { title: 'Chicken Road', items: chickenRoadResolved },
-            { title: 'Crash Games', items: crashGamesResolved },
-          ].map(s => renderSection(s))}
-
-          {matchesLoading ? (
-            <View style={styles.matchWrapper}>
-              <View style={styles.matchHeader}>
-                <View style={styles.matchHeaderLeft}>
-                  <CricketIcon width={22} height={26} fill="#FFFFFF" />
-                  <Text style={styles.matchTitle}>Cricket</Text>
-                </View>
-              </View>
-              <View style={{ paddingVertical: 40, alignItems: 'center', justifyContent: 'center' }}>
-                <ActivityIndicator color={colors.accent} size="large" />
-                <Text style={{ color: '#9CA3AF', marginTop: 12, fontSize: 15, fontFamily: AppFonts.montserratSemiBold }}>
-                  Loading top matches...
-                </Text>
-              </View>
-            </View>
-          ) : (
-            <>
-              {/* <MatchSection sportKey="cricket" navigation={finalNav} />
-              <MatchSection sportKey="tennis" navigation={finalNav} />
-              <MatchSection sportKey="soccer" navigation={finalNav} /> */}
-            </>
-          )}
-        </View>
-        <LandingFooter />
-      </ScrollView>
+      <FlatList
+        data={listSections}
+        keyExtractor={(item, index) => item.type + (item.sportKey || index)}
+        renderItem={renderPageItem}
+        ListHeaderComponent={ListHeader}
+        ListFooterComponent={ListFooter}
+        showsVerticalScrollIndicator={false}
+        initialNumToRender={4}
+        maxToRenderPerBatch={3}
+        windowSize={5}
+        removeClippedSubviews={Platform.OS === 'android'}
+      />
     </View>
   );
 }
@@ -1076,7 +1135,7 @@ const styles = StyleSheet.create({
   },
   matchRow: {
     flexDirection: 'row', alignItems: 'stretch',
-    backgroundColor: colors.background, borderBottomWidth: 0.7,
+    backgroundColor: '#11161c', borderBottomWidth: 0.7,
     borderBottomColor: '#1c2f4a', width: '100%'
   },
   matchRowLeft: {
@@ -1088,8 +1147,14 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
     alignSelf: 'stretch', borderRightWidth: 0.8, borderRightColor: '#1c2f4a'
   },
-  liveTag: { color: '#FFF', backgroundColor: '#D4322E', fontSize: 9, fontFamily: AppFonts.montserratExtraBold, alignSelf: 'flex-start', paddingHorizontal: 5, paddingVertical: 2, borderRadius: 3, marginBottom: 6, overflow: 'hidden' },
-  liveTagStatic: { color: '#FFF', backgroundColor: '#D4322E', fontSize: 9, fontFamily: AppFonts.montserratExtraBold, alignSelf: 'flex-start', paddingHorizontal: 5, paddingVertical: 2, borderRadius: 3, marginTop: 4, overflow: 'hidden' },
+  liveTag: {
+    color: '#FFF', backgroundColor: '#D4322E', fontSize: 9, fontFamily: AppFonts.montserratExtraBold, alignSelf: 'flex-start',
+    paddingHorizontal: 5, paddingVertical: 2, borderRadius: 3, marginBottom: 6, overflow: 'hidden'
+  },
+  liveTagStatic: {
+    color: '#FFF', backgroundColor: '#D4322E', fontSize: 9, fontFamily: AppFonts.montserratExtraBold, alignSelf: 'flex-start',
+    paddingHorizontal: 5, paddingVertical: 2, borderRadius: 3, marginTop: 4, overflow: 'hidden'
+  },
   matchMetaDay: { color: '#9CA3AF', fontSize: 10, fontFamily: AppFonts.montserratRegular, marginBottom: 2 },
   matchMetaTime: { color: '#FFFFFF', fontSize: 10, fontFamily: AppFonts.montserratSemiBold },
   topSportsWrapper: { marginTop: 20, marginBottom: 10, paddingHorizontal: 12 },
@@ -1099,7 +1164,10 @@ const styles = StyleSheet.create({
   topSportsGoText: { color: '#FFF', fontSize: 12, fontFamily: AppFonts.montserratSemiBold },
   topSportsList: { paddingRight: 20 },
   topSportsItem: { width: 100, alignItems: 'center', marginRight: 15 },
-  topSportsIconBox: { width: 80, height: 80, backgroundColor: '#132238', borderRadius: 12, alignItems: 'center', justifyContent: 'center', marginBottom: 8, borderWidth: 1, borderColor: '#1c2f4a' },
+  topSportsIconBox: {
+    width: 80, height: 80, backgroundColor: '#132238', borderRadius: 12, alignItems: 'center', justifyContent: 'center', marginBottom: 8,
+    borderWidth: 1, borderColor: '#1c2f4a'
+  },
   topSportsIcon: { width: 44, height: 44 },
   topSportsItemTitle: { color: '#FFFFFF', fontSize: 13, fontFamily: AppFonts.montserratSemiBold, textAlign: 'center' },
   matchTeamsBox: { flex: 1, paddingVertical: 10, paddingHorizontal: 12, justifyContent: 'center' },

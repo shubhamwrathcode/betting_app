@@ -57,7 +57,8 @@ const AddAccountScreen = () => {
   const navigation = useNavigation<any>()
   const insets = useSafeAreaInsets()
   const scrollRef = useRef<ScrollView>(null)
-  const { isAuthenticated } = useAuth()
+  const { isAuthenticated, user } = useAuth()
+  const isDemoUser = (user as any)?.role === 'demo' || (user as any)?.isDemo === true
   const winW = Dimensions.get('window').width
   const cardWidth = Math.min(300, Math.max(260, winW - 56))
 
@@ -288,7 +289,23 @@ const AddAccountScreen = () => {
       >
         {titleBlock}
 
-        {/* <View style={styles.bankPillWrap}>
+        {isDemoUser ? (
+          <View style={styles.demoOnlyContainer}>
+            <View style={styles.demoBanner}>
+              <Text style={styles.demoBannerText}>Demo user can only explore the platform.</Text>
+            </View>
+            <View style={styles.pageTitleCard}>
+              <Text style={styles.pageTitle}>Account Management Disabled</Text>
+              <Text style={styles.pageSubtitle}>Adding or removing bank accounts is not available for demo accounts. Please create a real account to start playing.</Text>
+            </View>
+            <Pressable style={styles.pillBackBtn} onPress={goBack}>
+              <Text style={styles.pillBackBtnText}>Go Back</Text>
+            </Pressable>
+          </View>
+        ) : (
+          <>
+
+            {/* <View style={styles.bankPillWrap}>
           <LinearGradient
             colors={['#AC5422', '#F97A31']}
             start={{ x: 0, y: 0 }}
@@ -299,171 +316,173 @@ const AddAccountScreen = () => {
           </LinearGradient>
         </View> */}
 
-        <Text style={styles.sectionHeading}>Your bank accounts</Text>
+            <Text style={styles.sectionHeading}>Your bank accounts</Text>
 
-        {listLoading ? (
-          <View style={styles.loadingRow}>
-            <ActivityIndicator color="#F97A31" />
-            <Text style={styles.loadingText}>Loading bank accounts...</Text>
-          </View>
-        ) : (
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.cardsRow}
-          >
-            {accounts.map(acc => (
-              <Pressable
-                key={String(acc._id)}
-                style={[
-                  styles.accountCard,
-                  { width: cardWidth },
-                  acc.isDefaultForWithdrawal && styles.accountCardSelected,
-                ]}
-                onPress={() => void selectAccount(String(acc._id))}
+            {listLoading ? (
+              <View style={styles.loadingRow}>
+                <ActivityIndicator color="#F97A31" />
+                <Text style={styles.loadingText}>Loading bank accounts...</Text>
+              </View>
+            ) : (
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.cardsRow}
               >
-                <Pressable
-                  style={styles.deleteBtn}
-                  hitSlop={8}
-                  onPress={() => removeAccount(String(acc._id))}
-                >
-                 
-                 <Image source={ImageAssets.bin} tintColor={'#fff'} style={{width:18,height:18,resizeMode:"contain"}} />
-                </Pressable>
-                <View style={styles.accountCardInner}>
-                  <Text style={styles.bankName}>{acc.bankName}</Text>
-                  <Text style={styles.holder}>{String(acc.accountHolderName || '').toUpperCase()}</Text>
-                  <Text style={styles.acctNum}>{maskAccountNumber(acc.accountNumber)}</Text>
-                  <Text style={styles.ifsc}>IFSC: {acc.ifscCode}</Text>
-                  {acc.isDefaultForWithdrawal ? (
-                    <View style={styles.defaultBadge}>
-                      <Text style={styles.defaultBadgeText}>Use for withdrawal</Text>
+                {accounts.map(acc => (
+                  <Pressable
+                    key={String(acc._id)}
+                    style={[
+                      styles.accountCard,
+                      { width: cardWidth },
+                      acc.isDefaultForWithdrawal && styles.accountCardSelected,
+                    ]}
+                    onPress={() => void selectAccount(String(acc._id))}
+                  >
+                    <Pressable
+                      style={styles.deleteBtn}
+                      hitSlop={8}
+                      onPress={() => removeAccount(String(acc._id))}
+                    >
+
+                      <Image source={ImageAssets.bin} tintColor={'#fff'} style={{ width: 18, height: 18, resizeMode: "contain" }} />
+                    </Pressable>
+                    <View style={styles.accountCardInner}>
+                      <Text style={styles.bankName}>{acc.bankName}</Text>
+                      <Text style={styles.holder}>{String(acc.accountHolderName || '').toUpperCase()}</Text>
+                      <Text style={styles.acctNum}>{maskAccountNumber(acc.accountNumber)}</Text>
+                      <Text style={styles.ifsc}>IFSC: {acc.ifscCode}</Text>
+                      {acc.isDefaultForWithdrawal ? (
+                        <View style={styles.defaultBadge}>
+                          <Text style={styles.defaultBadgeText}>Use for withdrawal</Text>
+                        </View>
+                      ) : null}
                     </View>
-                  ) : null}
+                  </Pressable>
+                ))}
+                {accounts.length < MAX_ACCOUNTS ? (
+                  <Pressable
+                    style={[styles.addCard, { width: cardWidth }]}
+                    onPress={openBankForm}
+                  >
+                    <View style={styles.addCircle}>
+                      <Text style={styles.addPlus}>+</Text>
+                    </View>
+                    <Text style={styles.addLabel}>Add Account</Text>
+                  </Pressable>
+                ) : null}
+              </ScrollView>
+            )}
+
+            {showBankForm ? (
+              <View style={styles.formSection}>
+                <Text style={styles.formTitle}>Add bank details</Text>
+                <Text style={styles.formHint}>OTP will be sent to your registered mobile number.</Text>
+
+                <Text style={styles.label}>Account Holder Name</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Account Holder Name"
+                  placeholderTextColor="#7f8ca0"
+                  value={form.accountHolderName}
+                  onChangeText={v => setForm(p => ({ ...p, accountHolderName: v }))}
+                />
+
+                <Text style={styles.label}>Account Number</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Account Number"
+                  placeholderTextColor="#7f8ca0"
+                  keyboardType="number-pad"
+                  value={form.accountNumber}
+                  onChangeText={v => setForm(p => ({ ...p, accountNumber: v }))}
+                />
+
+                <Text style={styles.label}>Bank Name</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Bank Name"
+                  placeholderTextColor="#7f8ca0"
+                  value={form.bankName}
+                  onChangeText={v => setForm(p => ({ ...p, bankName: v }))}
+                />
+
+                <Text style={styles.label}>Branch Name</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Branch Name"
+                  placeholderTextColor="#7f8ca0"
+                  value={form.branchName}
+                  onChangeText={v => setForm(p => ({ ...p, branchName: v }))}
+                />
+
+                <Text style={styles.label}>IFSC Code (11 characters)</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="IFSC Code"
+                  placeholderTextColor="#7f8ca0"
+                  autoCapitalize="characters"
+                  maxLength={11}
+                  value={form.ifscCode}
+                  onChangeText={v => setForm(p => ({ ...p, ifscCode: v.toUpperCase() }))}
+                />
+
+                <Text style={styles.label}>OTP (sent to your registered mobile)</Text>
+                <View style={styles.otpRow}>
+                  <TextInput
+                    style={[styles.input, styles.otpInput]}
+                    placeholder="Enter 6-digit OTP"
+                    placeholderTextColor="#7f8ca0"
+                    keyboardType="number-pad"
+                    maxLength={6}
+                    value={form.otp}
+                    onChangeText={v =>
+                      setForm(p => ({ ...p, otp: v.replace(/\D/g, '').slice(0, 6) }))
+                    }
+                  />
+                  <Pressable onPress={() => void handleSendOtp()} disabled={otpLoading}>
+                    <LinearGradient
+                      colors={['#AC5422', '#F97A31']}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 1 }}
+                      style={[styles.otpBtn, otpLoading && styles.btnDisabled]}
+                    >
+                      <Text style={styles.otpBtnText}>{otpLoading ? 'Sending...' : 'Send OTP'}</Text>
+                    </LinearGradient>
+                  </Pressable>
                 </View>
-              </Pressable>
-            ))}
-            {accounts.length < MAX_ACCOUNTS ? (
-              <Pressable
-                style={[styles.addCard, { width: cardWidth }]}
-                onPress={openBankForm}
-              >
-                <View style={styles.addCircle}>
-                  <Text style={styles.addPlus}>+</Text>
+
+                <View style={styles.formActions}>
+                  <Pressable
+                    onPress={() => void handleAddAccount()}
+                    disabled={addLoading || !otpSent}
+                    style={[styles.submitWrap, (!otpSent || addLoading) && styles.btnDisabled]}
+                  >
+                    <LinearGradient
+                      colors={['#AC5422', '#F97A31']}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 1 }}
+                      style={styles.submitGradient}
+                    >
+                      <Text style={styles.submitText}>{addLoading ? 'Adding...' : 'Add Account'}</Text>
+                    </LinearGradient>
+                  </Pressable>
+                  <Pressable
+                    style={styles.cancelBtn}
+                    onPress={() => {
+                      setShowBankForm(false)
+                      setOtpSent(false)
+                    }}
+                  >
+                    <Text style={styles.cancelBtnText}>Cancel</Text>
+                  </Pressable>
                 </View>
-                <Text style={styles.addLabel}>Add Account</Text>
-              </Pressable>
+              </View>
             ) : null}
-          </ScrollView>
+
+            <Text style={styles.footerNote}>{FOOTER_NOTE}</Text>
+          </>
         )}
-
-        {showBankForm ? (
-          <View style={styles.formSection}>
-            <Text style={styles.formTitle}>Add bank details</Text>
-            <Text style={styles.formHint}>OTP will be sent to your registered mobile number.</Text>
-
-            <Text style={styles.label}>Account Holder Name</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Account Holder Name"
-              placeholderTextColor="#7f8ca0"
-              value={form.accountHolderName}
-              onChangeText={v => setForm(p => ({ ...p, accountHolderName: v }))}
-            />
-
-            <Text style={styles.label}>Account Number</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Account Number"
-              placeholderTextColor="#7f8ca0"
-              keyboardType="number-pad"
-              value={form.accountNumber}
-              onChangeText={v => setForm(p => ({ ...p, accountNumber: v }))}
-            />
-
-            <Text style={styles.label}>Bank Name</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Bank Name"
-              placeholderTextColor="#7f8ca0"
-              value={form.bankName}
-              onChangeText={v => setForm(p => ({ ...p, bankName: v }))}
-            />
-
-            <Text style={styles.label}>Branch Name</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Branch Name"
-              placeholderTextColor="#7f8ca0"
-              value={form.branchName}
-              onChangeText={v => setForm(p => ({ ...p, branchName: v }))}
-            />
-
-            <Text style={styles.label}>IFSC Code (11 characters)</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="IFSC Code"
-              placeholderTextColor="#7f8ca0"
-              autoCapitalize="characters"
-              maxLength={11}
-              value={form.ifscCode}
-              onChangeText={v => setForm(p => ({ ...p, ifscCode: v.toUpperCase() }))}
-            />
-
-            <Text style={styles.label}>OTP (sent to your registered mobile)</Text>
-            <View style={styles.otpRow}>
-              <TextInput
-                style={[styles.input, styles.otpInput]}
-                placeholder="Enter 6-digit OTP"
-                placeholderTextColor="#7f8ca0"
-                keyboardType="number-pad"
-                maxLength={6}
-                value={form.otp}
-                onChangeText={v =>
-                  setForm(p => ({ ...p, otp: v.replace(/\D/g, '').slice(0, 6) }))
-                }
-              />
-              <Pressable onPress={() => void handleSendOtp()} disabled={otpLoading}>
-                <LinearGradient
-                  colors={['#AC5422', '#F97A31']}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                  style={[styles.otpBtn, otpLoading && styles.btnDisabled]}
-                >
-                  <Text style={styles.otpBtnText}>{otpLoading ? 'Sending...' : 'Send OTP'}</Text>
-                </LinearGradient>
-              </Pressable>
-            </View>
-
-            <View style={styles.formActions}>
-              <Pressable
-                onPress={() => void handleAddAccount()}
-                disabled={addLoading || !otpSent}
-                style={[styles.submitWrap, (!otpSent || addLoading) && styles.btnDisabled]}
-              >
-                <LinearGradient
-                  colors={['#AC5422', '#F97A31']}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                  style={styles.submitGradient}
-                >
-                  <Text style={styles.submitText}>{addLoading ? 'Adding...' : 'Add Account'}</Text>
-                </LinearGradient>
-              </Pressable>
-              <Pressable
-                style={styles.cancelBtn}
-                onPress={() => {
-                  setShowBankForm(false)
-                  setOtpSent(false)
-                }}
-              >
-                <Text style={styles.cancelBtnText}>Cancel</Text>
-              </Pressable>
-            </View>
-          </View>
-        ) : null}
-
-        <Text style={styles.footerNote}>{FOOTER_NOTE}</Text>
       </ScrollView>
     </View>
   )
@@ -730,6 +749,25 @@ const styles = StyleSheet.create({
     fontFamily: AppFonts.montserratMedium,
     fontSize: 12,
     lineHeight: 18,
+  },
+  demoBanner: {
+    backgroundColor: 'rgba(213,110,42,0.15)',
+    borderColor: '#D56E2A',
+    borderWidth: 1,
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  demoBannerText: {
+    color: '#D56E2A',
+    fontFamily: AppFonts.montserratSemiBold,
+    fontSize: 13,
+  },
+  demoOnlyContainer: {
+    marginTop: 10,
+    gap: 15,
   },
 })
 

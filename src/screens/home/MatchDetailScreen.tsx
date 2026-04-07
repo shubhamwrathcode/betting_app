@@ -201,6 +201,7 @@ type InlineBetSlipPanelProps = {
   calculateProfitLine: string
   placeBetError: string | null
   placeBetLoading: boolean
+  isDemoUser?: boolean
   stakeInputRef: React.RefObject<TextInput | null>
   onClear: () => void
   onPlaceBet: () => void
@@ -219,6 +220,7 @@ function InlineBetSlipPanel({
   calculateProfitLine,
   placeBetError,
   placeBetLoading,
+  isDemoUser,
   stakeInputRef,
   onClear,
   onPlaceBet,
@@ -371,11 +373,17 @@ function InlineBetSlipPanel({
       {placeBetError ? <Text style={styles.slipError}>{placeBetError}</Text> : null}
 
       <Pressable
-        style={[styles.placeBetBtn, placeBetLoading && { opacity: 0.7 }]}
+        style={[
+          styles.placeBetBtn,
+          (placeBetLoading || isDemoUser) && { opacity: 0.7 },
+          isDemoUser && { backgroundColor: '#4b5563', borderColor: '#374151' },
+        ]}
         onPress={onPlaceBet}
-        disabled={placeBetLoading}
+        disabled={placeBetLoading || isDemoUser}
       >
-        <Text style={styles.placeBetBtnText}>{placeBetLoading ? 'Placing…' : 'Place Bet'}</Text>
+        <Text style={styles.placeBetBtnText}>
+          {isDemoUser ? 'Login to Play' : placeBetLoading ? 'Placing…' : 'Place Bet'}
+        </Text>
       </Pressable>
     </View>
   )
@@ -785,14 +793,14 @@ function RunnerRows({
                 onPress={
                   canBack
                     ? () =>
-                        onSelectBet({
-                          elementId: elIdBack,
-                          betName: name,
-                          marketLabel: marketTitle,
-                          odds: oddsBack,
-                          betType: 'back',
-                          placePayload: { ...basePayload, betType: 'back', odds: oddsBack },
-                        })
+                      onSelectBet({
+                        elementId: elIdBack,
+                        betName: name,
+                        marketLabel: marketTitle,
+                        odds: oddsBack,
+                        betType: 'back',
+                        placePayload: { ...basePayload, betType: 'back', odds: oddsBack },
+                      })
                     : undefined
                 }
               />
@@ -805,14 +813,14 @@ function RunnerRows({
                 onPress={
                   canLay
                     ? () =>
-                        onSelectBet({
-                          elementId: elIdLay,
-                          betName: name,
-                          marketLabel: marketTitle,
-                          odds: oddsLay,
-                          betType: 'lay',
-                          placePayload: { ...basePayload, betType: 'lay', odds: oddsLay },
-                        })
+                      onSelectBet({
+                        elementId: elIdLay,
+                        betName: name,
+                        marketLabel: marketTitle,
+                        odds: oddsLay,
+                        betType: 'lay',
+                        placePayload: { ...basePayload, betType: 'lay', odds: oddsLay },
+                      })
                     : undefined
                 }
               />
@@ -904,16 +912,16 @@ function FancyNormalRows({
                 onPress={
                   canBack && r.backSelectionId
                     ? () => {
-                        const sid = r.backSelectionId as string
-                        onSelectBet({
-                          elementId: elIdBack,
-                          betName: r.label,
-                          marketLabel: r.marketName,
-                          odds: oddsBack,
-                          betType: 'back',
-                          placePayload: basePayload('back', sid, oddsBack),
-                        })
-                      }
+                      const sid = r.backSelectionId as string
+                      onSelectBet({
+                        elementId: elIdBack,
+                        betName: r.label,
+                        marketLabel: r.marketName,
+                        odds: oddsBack,
+                        betType: 'back',
+                        placePayload: basePayload('back', sid, oddsBack),
+                      })
+                    }
                     : undefined
                 }
               />
@@ -926,16 +934,16 @@ function FancyNormalRows({
                 onPress={
                   canLay && r.laySelectionId
                     ? () => {
-                        const sid = r.laySelectionId as string
-                        onSelectBet({
-                          elementId: elIdLay,
-                          betName: r.label,
-                          marketLabel: r.marketName,
-                          odds: oddsLay,
-                          betType: 'lay',
-                          placePayload: basePayload('lay', sid, oddsLay),
-                        })
-                      }
+                      const sid = r.laySelectionId as string
+                      onSelectBet({
+                        elementId: elIdLay,
+                        betName: r.label,
+                        marketLabel: r.marketName,
+                        odds: oddsLay,
+                        betType: 'lay',
+                        placePayload: basePayload('lay', sid, oddsLay),
+                      })
+                    }
                     : undefined
                 }
               />
@@ -1031,14 +1039,14 @@ function BackOnlyRows({
                     onPress={
                       canBack && row.selectionId
                         ? () =>
-                            onSelectBet({
-                              elementId: elId,
-                              betName: row.label,
-                              marketLabel: marketTitle,
-                              odds: oddsNum,
-                              betType: 'back',
-                              placePayload: { ...basePayload, betType: 'back', odds: oddsNum },
-                            })
+                          onSelectBet({
+                            elementId: elId,
+                            betName: row.label,
+                            marketLabel: marketTitle,
+                            odds: oddsNum,
+                            betType: 'back',
+                            placePayload: { ...basePayload, betType: 'back', odds: oddsNum },
+                          })
                         : undefined
                     }
                   />
@@ -1192,6 +1200,11 @@ const MatchDetailScreen = () => {
       navigation.navigate('Login', { initialTab: 'login' })
       return
     }
+    const isDemoUser = (user as any)?.role === 'demo' || (user as any)?.isDemo === true
+    if (isDemoUser) {
+      navigation.navigate('Login', { initialTab: 'login' })
+      return
+    }
     if (!selectedBet?.placePayload) {
       Alert.alert('Bet slip', 'Select a Back or Lay price first.')
       return
@@ -1291,6 +1304,7 @@ const MatchDetailScreen = () => {
           calculateProfitLine={calculateProfitLine}
           placeBetError={placeBetError}
           placeBetLoading={placeBetLoading}
+          isDemoUser={(user as any)?.role === 'demo' || (user as any)?.isDemo === true}
           stakeInputRef={stakeInputRef}
           onClear={clearBetSlip}
           onPlaceBet={handlePlaceBet}
@@ -1326,7 +1340,7 @@ const MatchDetailScreen = () => {
     <View style={styles.page}>
       <View style={[styles.topBar, { paddingTop: Math.max(insets.top, 8) }]}>
         <Pressable hitSlop={12} onPress={() => navigation.goBack()} style={styles.backBtn}>
-        <Image source={ImageAssets.backImg} style={{width:24,height:24,tintColor:'#fff'}} resizeMode="contain" />
+          <Image source={ImageAssets.backImg} style={{ width: 24, height: 24, tintColor: '#fff' }} resizeMode="contain" />
         </Pressable>
         <Text style={styles.topSport}>{sportName === 'soccer' ? 'Football' : sportName}</Text>
         <View style={{ width: 56 }} />
@@ -1414,26 +1428,26 @@ const MatchDetailScreen = () => {
 
         {fancyMiniMarkets.length > 0
           ? fancyMiniMarkets.map((fm: any, fi: number) => (
-              <MarketBlock
-                key={`fancy-mini-${pickMarketId(fm) ?? fi}-${fi}`}
-                icon="✨"
-                title={String(fm.marketName ?? fm.market ?? fm.mname ?? 'Fancy')}
-                minMax={formatMinMaxLabel(fm)}
-              >
-                <RunnerRows
-                  market={fm}
-                  sportName={sportName}
-                  placeBetGameId={placeBetGameId}
-                  eventNameForBets={eventNameForBets}
-                  seriesName={params.seriesName}
-                  marketTypeApi="fancy"
-                  rowKeyPrefix={`fmini-${fi}`}
-                  selectedElementId={selectedBet?.elementId ?? null}
-                  onSelectBet={onSelectBet}
-                  betSlipBelow={betSlipBelow}
-                />
-              </MarketBlock>
-            ))
+            <MarketBlock
+              key={`fancy-mini-${pickMarketId(fm) ?? fi}-${fi}`}
+              icon="✨"
+              title={String(fm.marketName ?? fm.market ?? fm.mname ?? 'Fancy')}
+              minMax={formatMinMaxLabel(fm)}
+            >
+              <RunnerRows
+                market={fm}
+                sportName={sportName}
+                placeBetGameId={placeBetGameId}
+                eventNameForBets={eventNameForBets}
+                seriesName={params.seriesName}
+                marketTypeApi="fancy"
+                rowKeyPrefix={`fmini-${fi}`}
+                selectedElementId={selectedBet?.elementId ?? null}
+                onSelectBet={onSelectBet}
+                betSlipBelow={betSlipBelow}
+              />
+            </MarketBlock>
+          ))
           : null}
 
         {isCricket && sessionsFancyRows.length > 0 ? (
@@ -1502,36 +1516,30 @@ const MatchDetailScreen = () => {
 
         {isCricket
           ? backOnlyFancyBlocks.map((block: BackOnlyFancyBlock) => (
-              <MarketBlock
-                key={`bo-${block.key}`}
-                icon="📋"
-                title={block.title}
-                minMax={block.minMax}
-                columns="backOnly"
-              >
-                <BackOnlyRows
-                  blockKey={block.key}
-                  market={block.market}
-                  sportName={sportName}
-                  placeBetGameId={placeBetGameId}
-                  eventNameForBets={eventNameForBets}
-                  seriesName={params.seriesName}
-                  rows={block.rows}
-                  selectedElementId={selectedBet?.elementId ?? null}
-                  onSelectBet={onSelectBet}
-                  betSlipBelow={betSlipBelow}
-                />
-              </MarketBlock>
-            ))
+            <MarketBlock
+              key={`bo-${block.key}`}
+              icon="📋"
+              title={block.title}
+              minMax={block.minMax}
+              columns="backOnly"
+            >
+              <BackOnlyRows
+                blockKey={block.key}
+                market={block.market}
+                sportName={sportName}
+                placeBetGameId={placeBetGameId}
+                eventNameForBets={eventNameForBets}
+                seriesName={params.seriesName}
+                rows={block.rows}
+                selectedElementId={selectedBet?.elementId ?? null}
+                onSelectBet={onSelectBet}
+                betSlipBelow={betSlipBelow}
+              />
+            </MarketBlock>
+          ))
           : null}
       </ScrollView>
 
-      {/* {!selectedBet ? (
-        <View style={[styles.betSlipBar, { paddingBottom: Math.max(insets.bottom, 12) }]}>
-          <Text style={styles.betSlipTitle}>Bet slip</Text>
-          <Text style={styles.betSlipHint}>Tap Back or Lay — the bet form opens under that row.</Text>
-        </View>
-      ) : null} */}
     </View>
   )
 }
@@ -1546,7 +1554,7 @@ const styles = StyleSheet.create({
     paddingBottom: 8,
     backgroundColor: '#060d18',
     borderBottomWidth: 0.7,
-    borderBottomColor: '#ffffff',
+    borderBottomColor: '#1c2f4a',
   },
   backBtn: { paddingVertical: 6, paddingHorizontal: 4 },
   backText: { color: '#93C5FD', fontFamily: AppFonts.montserratSemiBold, fontSize: 14 },
@@ -1582,7 +1590,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     backgroundColor: '#060d18',
     borderBottomWidth: 0.7,
-    borderBottomColor: '#ffffff',
+    borderBottomColor: '#1c2f4a',
   },
   tabMarkets: {
     backgroundColor: '#16a34a',
@@ -1600,7 +1608,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     overflow: 'hidden',
     borderWidth: 0.7,
-    borderColor: '#ffffff',
+    borderColor: '#1c2f4a',
     backgroundColor: '#0f172a',
   },
   marketHead: {
@@ -1609,7 +1617,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 12,
     paddingVertical: 10,
-    backgroundColor: '#111827',
+    backgroundColor: '#1e2a38',
     gap: 10,
   },
   marketTitleRow: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8, minWidth: 0 },
@@ -1627,9 +1635,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 8,
     paddingHorizontal: 8,
-    backgroundColor: '#0c1524',
+    backgroundColor: '#1a2332',
     borderBottomWidth: 0.7,
-    borderBottomColor: '#ffffff',
+    borderBottomColor: '#1c2f4a',
   },
   colMarket: {
     flex: 1.15,
@@ -1656,11 +1664,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'stretch',
     borderBottomWidth: 0.7,
-    borderBottomColor: '#ffffff',
+    borderBottomColor: '#1c2f4a',
     paddingVertical: 6,
     paddingHorizontal: 6,
     gap: 6,
     minHeight: 56,
+    backgroundColor: '#1a2332'
   },
   backOnlyCellWrap: { flex: 2, minWidth: 0 },
   backOnlyLaySpacer: { flex: 1, minWidth: 0 },

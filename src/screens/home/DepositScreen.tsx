@@ -75,7 +75,19 @@ const DepositScreen = () => {
   const [transferMenuRect, setTransferMenuRect] = useState({ top: 0, left: 0, width: 0 })
   const [uploadSourceOpen, setUploadSourceOpen] = useState(false)
 
-  const goBack = useCallback(() => navigation.navigate(returnToTab), [navigation, returnToTab])
+  const goBack = useCallback(() => {
+    const tabRoutes = ['Home', 'Casino', 'InPlay', 'SportsBook', 'Menu']
+    if (tabRoutes.includes(returnToTab)) {
+      navigation.navigate('MainTabs', { screen: returnToTab })
+    } else {
+      // Fallback if it's a top level screen or unknown
+      try {
+        navigation.navigate(returnToTab)
+      } catch (e) {
+        navigation.navigate('MainTabs', { screen: 'Home' })
+      }
+    }
+  }, [navigation, returnToTab])
 
   useEffect(() => {
     if (!isAuthenticated || isDemoUser) return
@@ -313,8 +325,9 @@ const DepositScreen = () => {
               <Text style={styles.topTitle}>Deposit Disabled</Text>
               <Text style={styles.topDesc}>Financial transactions are not available for demo accounts. Please create a real account to start playing.</Text>
             </View>
-            <Pressable style={styles.nextBtn} onPress={goBack}>
-              <Text style={styles.nextBtnText}>Go Back</Text>
+
+            <Pressable style={styles.backBtn} onPress={goBack}>
+              <Text style={styles.backBtnText}>Go Back</Text>
             </Pressable>
           </View>
         ) : (

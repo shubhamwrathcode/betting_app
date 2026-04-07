@@ -88,7 +88,8 @@ const getGameProviderCode = (game: CasinoGame) => game.providerCode || game.prov
 const CasinoScreen = () => {
   const navigation = useNavigation<any>()
   const route = useRoute<any>()
-  const { isAuthenticated } = useAuth()
+  const { isAuthenticated, user } = useAuth()
+  const isDemoUser = (user as any)?.role === 'demo' || (user as any)?.isDemo === true
   const sliderRef = useRef<FlatList<number> | null>(null)
   const bannerWidth = Math.max(260, Dimensions.get('window').width - 24)
 
@@ -250,6 +251,10 @@ const CasinoScreen = () => {
       })
       navigation.navigate('Login', { initialTab: 'login' })
       return
+    }
+    // Demo users are allowed to launch games (view-only mode or backend-restricted).
+    if (isDemoUser) {
+      // Allow launch
     }
     const gameCode = getGameCode(game)
     const providerCode = getGameProviderCode(game)

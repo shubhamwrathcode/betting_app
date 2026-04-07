@@ -9,9 +9,11 @@ import {
   Text,
   TextInput,
   View,
+  Platform,
 } from 'react-native'
 import { useNavigation } from '@react-navigation/native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import FastImage from 'react-native-fast-image'
 import { apiClient, API_BASE_URL } from '../../api/client'
 import { API_ENDPOINTS } from '../../api/endpoints'
 import { AppFonts } from '../../components/AppFonts'
@@ -168,21 +170,77 @@ const SearchScreen = () => {
     })
   }
 
+  const activeGames = hasSearchText ? results.games : trendingGames
+
+  const renderHeader = () => (
+    <View style={styles.resultsHeader}>
+      {!hasSearchText ? (
+        <View style={styles.trendingHeader}>
+          <Text style={styles.blockTitle}>Trending games</Text>
+          <Pressable
+            onPress={() =>
+              navigation.navigate('MainTabs', {
+                screen: 'Casino',
+                params: {
+                  searchSelection: {
+                    providerCode: 'all',
+                    categoryCode: 'lobby',
+                    gameName: '',
+                    key: Date.now(),
+                  },
+                },
+              })
+            }
+          >
+            <Text style={styles.viewAllText}>View all</Text>
+          </Pressable>
+        </View>
+      ) : searchLoading ? (
+        <View style={styles.statusBox}>
+          <ActivityIndicator size="small" color="#F0A769" />
+          <Text style={styles.helpText}>Searching...</Text>
+        </View>
+      ) : (
+        <>
+          {results.matches.length > 0 && (
+            <View style={styles.block}>
+              <Text style={styles.blockTitle}>Matches</Text>
+              {results.matches.map((match, idx) => (
+                <Pressable
+                  key={`match-${idx}`}
+                  style={styles.matchItem}
+                  onPress={() => navigation.navigate('MainTabs', { screen: 'SportsBook' })}
+                >
+                  <Text style={styles.matchName}>
+                    {match.eventName || match.event_name || match.name || 'Match'}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+          )}
+
+          {results.games.length > 0 && (
+            <Text style={[styles.blockTitle, { marginTop: 24, marginBottom: 12 }]}>Games</Text>
+          )}
+
+          {results.games.length === 0 && results.matches.length === 0 && (
+            <Text style={styles.helpText}>No games or matches found</Text>
+          )}
+        </>
+      )}
+    </View>
+  )
+
   return (
     <View style={[styles.page, { paddingTop: insets.top }]}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Search</Text>
-        <Pressable onPress={() => navigation.goBack()}>
-          <Text style={styles.closeText}>Close</Text>
-        </Pressable>
-      </View>
+      <View style={styles.fixedHeaderArea}>
+        <View style={styles.header}>
+          <Text style={styles.title}>Search</Text>
+          <Pressable onPress={() => navigation.goBack()} hitSlop={10}>
+            <Text style={styles.closeText}>Close</Text>
+          </Pressable>
+        </View>
 
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        nestedScrollEnabled
-        keyboardShouldPersistTaps="handled"
-        contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 90 }]}
-      >
         <View style={styles.searchBox}>
           <Image source={ImageAssets.search} style={styles.searchIcon} />
           <TextInput
@@ -191,119 +249,52 @@ const SearchScreen = () => {
             placeholder="Search games and matches"
             placeholderTextColor="#8FA1BC"
             style={styles.searchInput}
-            autoFocus
           />
         </View>
+      </View>
 
-        {!hasSearchText ? (
-          <Text style={styles.helpText}>Enter at least {SEARCH_MIN_CHARS} characters to search</Text>
-        ) : searchLoading ? (
-          <Text style={styles.helpText}>Searching...</Text>
-        ) : (
-          <>
-            {results.games.length > 0 ? (
-              <View style={styles.block}>
-                <Text style={styles.blockTitle}>Games</Text>
-                <FlatList
-                  data={results.games}
-                  keyExtractor={(game, idx) => `${game.code || game.gameCode || idx}`}
-                  numColumns={GRID_COLUMNS}
-                  scrollEnabled={false}
-                  columnWrapperStyle={styles.gridRow}
-                  contentContainerStyle={styles.gamesGrid}
-                  renderItem={({ item: game }) => {
-                    const img = gameImage(game)
-                    return (
-                      <Pressable
-                        style={[styles.resultItemGrid, { width: gameCardWidth }]}
-                        onPress={() => applyGameFilterFromSearch(game)}
-                      >
-                        <Image
-                          source={img ? { uri: toAbsoluteImageUrl(img) } : ImageAssets.gameItemsliderPng}
-                          style={styles.resultImageGrid}
-                        />
-                        <Text style={styles.resultName} numberOfLines={1}>
-                          {getGameName(game)}
-                        </Text>
-                      </Pressable>
-                    )
-                  }}
-                />
-              </View>
-            ) : null}
-
-            {results.matches.length > 0 ? (
-              <View style={styles.block}>
-                <Text style={styles.blockTitle}>Matches</Text>
-                {results.matches.map((match, idx) => (
-                  <Pressable
-                    key={`match-${idx}`}
-                    style={styles.matchItem}
-                    onPress={() => navigation.navigate('MainTabs', { screen: 'SportsBook' })}
-                  >
-                    <Text style={styles.matchName}>
-                      {match.eventName || match.event_name || match.name || 'Match'}
-                    </Text>
-                  </Pressable>
-                ))}
-              </View>
-            ) : null}
-
-            {results.games.length === 0 && results.matches.length === 0 ? (
-              <Text style={styles.helpText}>No games or matches found</Text>
-            ) : null}
-          </>
-        )}
-
-        <View style={styles.block}>
-          <View style={styles.blockHeader}>
-            <Text style={styles.blockTitle}>Trending games</Text>
-            <Pressable
-              onPress={() =>
-                navigation.navigate('MainTabs', {
-                  screen: 'Casino',
-                  params: {
-                    searchSelection: {
-                      providerCode: 'all',
-                      categoryCode: 'lobby',
-                      gameName: '',
-                      key: Date.now(),
-                    },
-                  },
-                })
-              }
-            >
-              <Text style={styles.viewAllText}>View all</Text>
-            </Pressable>
-          </View>
-          {trendingLoading ? (
-            <Text style={styles.helpText}>Loading trending...</Text>
-          ) : (
-            <FlatList
-              data={trendingGames}
-              keyExtractor={(game, idx) => `${game.code || game.gameCode || idx}`}
-              numColumns={GRID_COLUMNS}
-              scrollEnabled={false}
-              columnWrapperStyle={styles.gridRow}
-              contentContainerStyle={styles.gamesGrid}
-              renderItem={({ item: game }) => {
-                const img = gameImage(game)
-                return (
-                  <Pressable
-                    style={[styles.trendCard, { width: gameCardWidth }]}
-                    onPress={() => applyGameFilterFromSearch(game)}
-                  >
-                    <Image
-                      source={img ? { uri: toAbsoluteImageUrl(img) } : ImageAssets.gameItemsliderPng}
-                      style={styles.trendImage}
-                    />
-                  </Pressable>
-                )
-              }}
-            />
-          )}
-        </View>
-      </ScrollView>
+      <View style={{ flex: 1, }}>
+        <FlatList
+          data={activeGames}
+          keyExtractor={(item, idx) => `${getGameCode(item)}-${idx}`}
+          numColumns={GRID_COLUMNS}
+          ListHeaderComponent={renderHeader}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+          style={{ flex: 1 }}
+          contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 40, flexGrow: 1 }]}
+          columnWrapperStyle={styles.gridRow}
+          initialNumToRender={12}
+          maxToRenderPerBatch={10}
+          windowSize={10}
+          onEndReachedThreshold={0.5}
+          renderItem={({ item: game }) => {
+            const img = gameImage(game)
+            return (
+              <Pressable
+                style={styles.gameCardItem}
+                onPress={() => applyGameFilterFromSearch(game)}
+              >
+                <View style={styles.imageContainer}>
+                  <FastImage
+                    source={img ? { uri: toAbsoluteImageUrl(img) } : ImageAssets.gameItemsliderPng}
+                    style={styles.gameImage}
+                    resizeMode={FastImage.resizeMode.cover}
+                  />
+                </View>
+                {hasSearchText && (
+                  <Text style={styles.resultName} numberOfLines={1}>
+                    {getGameName(game)}
+                  </Text>
+                )}
+              </Pressable>
+            )
+          }}
+          ListEmptyComponent={() =>
+            !hasSearchText && !trendingLoading ? <Text style={styles.helpText}>No trending games available</Text> : null
+          }
+        />
+      </View>
     </View>
   )
 }
@@ -318,7 +309,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
   },
-  title: { color: '#FFF', fontFamily: AppFonts.montserratBold, fontSize: 20  },
+  title: { color: '#FFF', fontFamily: AppFonts.montserratBold, fontSize: 20 },
   closeText: { color: '#9CB1D0', fontFamily: AppFonts.montserratSemiBold, fontSize: 12 },
   searchBox: {
     marginTop: 8,
@@ -349,21 +340,23 @@ const styles = StyleSheet.create({
   blockHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   blockTitle: { color: '#FFF', fontFamily: AppFonts.montserratBold, fontSize: 14 },
   viewAllText: { color: '#F0A769', fontFamily: AppFonts.montserratSemiBold, fontSize: 12 },
-  gamesGrid: { paddingTop: 10, gap: 10 },
-  gridRow: { justifyContent: 'space-between' },
-  resultItemGrid: { gap: 8, marginBottom: 10 },
-  resultImageGrid: { width: '100%', height: 138, borderRadius: 10, backgroundColor: '#18243A' },
-  resultName: { color: '#E6EEFC', fontFamily: AppFonts.montserratMedium, fontSize: 12, flex: 1 },
+  fixedHeaderArea: { paddingHorizontal: 12, paddingBottom: 10 },
+  resultsHeader: { paddingHorizontal: 12, paddingBottom: 10 },
+  trendingHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 14, marginBottom: 12 },
+  statusBox: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 20 },
+  gridRow: { justifyContent: 'space-between', paddingHorizontal: 12 },
+  gameCardItem: { width: '48%', marginBottom: 16 },
+  imageContainer: { width: '100%', height: 138, borderRadius: 12, overflow: 'hidden', backgroundColor: '#1F2C47' },
+  gameImage: { width: '100%', height: '100%' },
+  resultName: { color: '#E6EEFC', fontFamily: AppFonts.montserratMedium, fontSize: 12, marginTop: 6, paddingHorizontal: 2 },
   matchItem: {
     marginTop: 8,
-    paddingVertical: 10,
-    paddingHorizontal: 10,
+    paddingVertical: 12,
+    paddingHorizontal: 12,
     borderRadius: 8,
     backgroundColor: '#15233A',
   },
-  matchName: { color: '#E6EEFC', fontFamily: AppFonts.montserratMedium, fontSize: 12 },
-  trendCard: { height: 138, borderRadius: 12, overflow: 'hidden', backgroundColor: '#1F2C47' },
-  trendImage: { width: '100%', height: '100%' },
+  matchName: { color: '#E6EEFC', fontFamily: AppFonts.montserratMedium, fontSize: 13 },
 })
 
 export default SearchScreen

@@ -46,8 +46,9 @@ const DepositScreen = () => {
   const navigation = useNavigation<any>()
   const route = useRoute<RouteProp<{ Deposit: DepositRouteParams }, 'Deposit'>>()
   const insets = useSafeAreaInsets()
-  const { isAuthenticated } = useAuth()
+  const { isAuthenticated, user } = useAuth()
   const returnToTab = route.params?.returnToTab ?? 'Home'
+  const isDemoUser = (user as any)?.role === 'demo' || (user as any)?.isDemo === true
 
   const [masterAccounts, setMasterAccounts] = useState<AnyObj[]>([])
   const [optionsLoading, setOptionsLoading] = useState(true)
@@ -77,7 +78,7 @@ const DepositScreen = () => {
   const goBack = useCallback(() => navigation.navigate(returnToTab), [navigation, returnToTab])
 
   useEffect(() => {
-    if (!isAuthenticated) return
+    if (!isAuthenticated || isDemoUser) return
     const load = async () => {
       try {
         const [accRes, limitsRes, configRes] = await Promise.all([
@@ -303,213 +304,230 @@ const DepositScreen = () => {
         onSearchPress={() => navigation.navigate('Search')}
       />
       <ScrollView contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 100 }]} showsVerticalScrollIndicator={false}>
-        {platformConfig?.depositServiceStatus === false ? <Text style={styles.banner}>Deposits are temporarily unavailable. Please try again later.</Text> : null}
-        <View style={styles.topCard}>
-          <Text style={styles.topTitle}>Deposit</Text>
-          <Text style={styles.topDesc}>{step === 1 ? 'Select payment method, choose or enter amount, then click Next.' : 'Pay to the account below and enter your payment details.'}</Text>
-        </View>
-
-        {step === 1 ? (
-          <>
-            <Pressable
-              ref={typeRef}
-              style={styles.typeDropdown}
-              onPress={() => {
-                typeRef.current?.measureInWindow((x, y, width, height) => {
-                  setTypeMenuRect({ top: y + height + 4, left: x, width })
-                  setTypeOpen(true)
-                })
-              }}
-            >
-              <Text style={styles.dropdownLabel}>{typeToLabel(selectedPayment)}</Text>
-              <Text style={styles.dropdownChevron}>⌄</Text>
-            </Pressable>
-            {typeOpen ? (
-              <Modal transparent visible={typeOpen} animationType="fade" onRequestClose={() => setTypeOpen(false)}>
-                <View style={styles.dropdownModalRoot}>
-                  <Pressable style={styles.dropdownBackdrop} onPress={() => setTypeOpen(false)} />
-                  <View style={[styles.dropdownSheet, { top: typeMenuRect.top, left: typeMenuRect.left, width: typeMenuRect.width }]}>
-                    {paymentTypesFromBackend.map(type => (
-                      <Pressable
-                        key={String(type)}
-                        style={[styles.dropdownRow, selectedPayment === type && styles.dropdownRowActive]}
-                        onPress={() => {
-                          setSelectedPayment(String(type))
-                          setSelectedOptionIndex(0)
-                          setTypeOpen(false)
-                        }}
-                      >
-                        <Text style={[styles.dropdownRowText, selectedPayment === type && styles.dropdownRowTextActive]}>
-                          {typeToLabel(String(type))}
-                        </Text>
-                      </Pressable>
-                    ))}
-                  </View>
-                </View>
-              </Modal>
-            ) : null}
-
-            {selectedPayment === 'crypto' ? (
-              <View style={styles.block}>
-                <Text style={styles.blockTitle}>Select Currency</Text>
-                <Pressable style={styles.input}><Text style={styles.inputText}>{selectedCryptoCurrency}</Text></Pressable>
-              </View>
-            ) : (
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.optionRow}>
-                {currentOptionList.map((acc, idx) => (
-                  <Pressable key={String(acc?._id || idx)} style={[styles.optBtn, safeOptionIndex === idx && styles.optBtnActive]} onPress={() => setSelectedOptionIndex(idx)}>
-                    <Text style={[styles.optBtnText, safeOptionIndex === idx && styles.optBtnTextActive]}>Option {idx + 1}</Text>
-                  </Pressable>
-                ))}
-              </ScrollView>
-            )}
-
-            <View style={styles.amountGridCard}>
-              <View style={styles.amountGrid}>
-                {AMOUNT_OPTIONS.map(value => (
-                  <Pressable key={value} style={[styles.amountChip, selectedAmount === value && styles.amountChipActive]} onPress={() => { setSelectedAmount(value); setAmountInput(String(value)) }}>
-                    <Text style={[styles.amountChipText, selectedAmount === value && styles.amountChipTextActive]}>+{value.toLocaleString('en-IN')}</Text>
-                  </Pressable>
-                ))}
-              </View>
+        {isDemoUser ? (
+          <View style={styles.demoOnlyContainer}>
+            <View style={styles.demoBanner}>
+              <Text style={styles.demoBannerText}>Demo user can only explore the platform.</Text>
             </View>
-
-            <View style={styles.block}>
-              <Text style={styles.blockTitle}>Enter Amount (INR)</Text>
-              <Text style={styles.limitText}>Limit: ₹{minAllowed.toLocaleString('en-IN')} - ₹{maxAllowed.toLocaleString('en-IN')}.{transactionLimits?.bonusPercentage != null ? ` Bonus: ${Number(transactionLimits.bonusPercentage)}%.` : ''}</Text>
-              <View style={styles.inputRow}>
-                <TextInput
-                  style={[styles.input, { flex: 1 }]}
-                  placeholder="Enter Amount To Be Deposited"
-                  placeholderTextColor="#7f8ca0"
-                  value={amountInput}
-                  keyboardType="number-pad"
-                  onChangeText={txt => setAmountInput(cleanAmount(txt))}
-                />
-                <Pressable style={styles.clearBtn} onPress={() => { setAmountInput(''); setSelectedAmount(null) }}>
-                  <Text style={styles.clearBtnText}>Clear</Text>
-                </Pressable>
-              </View>
+            <View style={styles.topCard}>
+              <Text style={styles.topTitle}>Deposit Disabled</Text>
+              <Text style={styles.topDesc}>Financial transactions are not available for demo accounts. Please create a real account to start playing.</Text>
             </View>
-
-            <Pressable style={[styles.nextBtn, (optionsLoading || cryptoAddressLoading) && styles.disabledBtn]} disabled={optionsLoading || cryptoAddressLoading} onPress={() => void handleNext()}>
-              <Text style={styles.nextBtnText}>{cryptoAddressLoading ? 'Fetching address...' : 'Next'}</Text>
+            <Pressable style={styles.nextBtn} onPress={goBack}>
+              <Text style={styles.nextBtnText}>Go Back</Text>
             </Pressable>
-          </>
+          </View>
         ) : (
           <>
-            <Pressable style={styles.backBtn} onPress={() => setStep(1)}>
-              <Text style={styles.backBtnText}>Back</Text>
-            </Pressable>
-            <Text style={styles.stepTitle}>{selectedPayment === 'crypto' ? 'Deposit to this crypto address' : `Pay to this ${selectedAccount?.type === 'bank' ? 'bank' : 'UPI'} account`}</Text>
+            {platformConfig?.depositServiceStatus === false ? <Text style={styles.banner}>Deposits are temporarily unavailable. Please try again later.</Text> : null}
+            <View style={styles.topCard}>
+              <Text style={styles.topTitle}>Deposit</Text>
+              <Text style={styles.topDesc}>{step === 1 ? 'Select payment method, choose or enter amount, then click Next.' : 'Pay to the account below and enter your payment details.'}</Text>
+            </View>
 
-            {(selectedAccount?.type === 'upi' || selectedPayment === 'crypto') && qrValue ? (
-              <View style={styles.qrWrap}>
-                <Image source={{ uri: makeQrUrl(qrValue) }} style={styles.qrImage} />
-              </View>
-            ) : null}
-
-            {selectedAccount?.type === 'bank' ? (
-              <View style={styles.block}>
-                <View style={styles.row}><Text style={styles.key}>Bank name</Text><Text style={styles.val}>{selectedAccount?.bankName || '—'}</Text></View>
-                <View style={styles.row}><Text style={styles.key}>Account Holder Name</Text><Text style={styles.val}>{selectedAccount?.accountHolderName || '—'}</Text></View>
-                <View style={styles.row}><Text style={styles.key}>Account Number</Text><Text style={styles.val}>{selectedAccount?.accountNumber || '—'}</Text></View>
-                <View style={styles.row}><Text style={styles.key}>IFSC Code</Text><Text style={styles.val}>{selectedAccount?.ifscCode || '—'}</Text></View>
-              </View>
-            ) : null}
-
-            {selectedAccount?.type === 'bank' ? (
-              <View style={styles.block}>
-                <Text style={styles.blockTitle}>Transfer type</Text>
+            {step === 1 ? (
+              <>
                 <Pressable
-                  ref={transferRef}
-                  style={styles.selectLike}
+                  ref={typeRef}
+                  style={styles.typeDropdown}
                   onPress={() => {
-                    transferRef.current?.measureInWindow((x, y, width, height) => {
-                      setTransferMenuRect({ top: y + height + 4, left: x, width })
-                      setTransferOpen(true)
+                    typeRef.current?.measureInWindow((x, y, width, height) => {
+                      setTypeMenuRect({ top: y + height + 4, left: x, width })
+                      setTypeOpen(true)
                     })
                   }}
                 >
-                  <Text style={styles.selectLikeText}>
-                    {BANK_TRANSFER_OPTIONS.find(opt => opt.value === bankTransferMethod)?.label || 'IMPS'}
-                  </Text>
-                  <Text style={styles.selectLikeChevron}>⌄</Text>
+                  <Text style={styles.dropdownLabel}>{typeToLabel(selectedPayment)}</Text>
+                  <Text style={styles.dropdownChevron}>⌄</Text>
                 </Pressable>
-                {transferOpen ? (
-                  <Modal transparent visible={transferOpen} animationType="fade" onRequestClose={() => setTransferOpen(false)}>
+                {typeOpen ? (
+                  <Modal transparent visible={typeOpen} animationType="fade" onRequestClose={() => setTypeOpen(false)}>
                     <View style={styles.dropdownModalRoot}>
-                      <Pressable style={styles.dropdownBackdrop} onPress={() => setTransferOpen(false)} />
-                      <View style={[styles.dropdownSheet, { top: transferMenuRect.top, left: transferMenuRect.left, width: transferMenuRect.width }]}>
-                        {BANK_TRANSFER_OPTIONS.map(opt => (
+                      <Pressable style={styles.dropdownBackdrop} onPress={() => setTypeOpen(false)} />
+                      <View style={[styles.dropdownSheet, { top: typeMenuRect.top, left: typeMenuRect.left, width: typeMenuRect.width }]}>
+                        {paymentTypesFromBackend.map(type => (
                           <Pressable
-                            key={opt.value}
-                            style={[styles.dropdownRow, bankTransferMethod === opt.value && styles.dropdownRowActive]}
+                            key={String(type)}
+                            style={[styles.dropdownRow, selectedPayment === type && styles.dropdownRowActive]}
                             onPress={() => {
-                              setBankTransferMethod(opt.value)
-                              setTransferOpen(false)
+                              setSelectedPayment(String(type))
+                              setSelectedOptionIndex(0)
+                              setTypeOpen(false)
                             }}
                           >
-                            <Text style={[styles.dropdownRowText, bankTransferMethod === opt.value && styles.dropdownRowTextActive]}>{opt.label}</Text>
+                            <Text style={[styles.dropdownRowText, selectedPayment === type && styles.dropdownRowTextActive]}>
+                              {typeToLabel(String(type))}
+                            </Text>
                           </Pressable>
                         ))}
                       </View>
                     </View>
                   </Modal>
                 ) : null}
-              </View>
-            ) : null}
 
-            {selectedAccount?.type === 'upi' ? (
-              <View style={styles.upiCard}>
-                <Text style={styles.key}>UPI ID :</Text>
-                <Text style={styles.val}>{selectedAccount?.upiId || '—'}</Text>
-                <Text style={styles.val}>{selectedAccount?.upiName || ''}</Text>
-              </View>
-            ) : null}
+                {selectedPayment === 'crypto' ? (
+                  <View style={styles.block}>
+                    <Text style={styles.blockTitle}>Select Currency</Text>
+                    <Pressable style={styles.input}><Text style={styles.inputText}>{selectedCryptoCurrency}</Text></Pressable>
+                  </View>
+                ) : (
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.optionRow}>
+                    {currentOptionList.map((acc, idx) => (
+                      <Pressable key={String(acc?._id || idx)} style={[styles.optBtn, safeOptionIndex === idx && styles.optBtnActive]} onPress={() => setSelectedOptionIndex(idx)}>
+                        <Text style={[styles.optBtnText, safeOptionIndex === idx && styles.optBtnTextActive]}>Option {idx + 1}</Text>
+                      </Pressable>
+                    ))}
+                  </ScrollView>
+                )}
 
-            {selectedPayment === 'crypto' ? (
-              <View style={styles.block}>
-                <Text style={styles.blockTitle}>Deposit Address (BEP20)</Text>
-                <View style={styles.inputRow}>
-                  <TextInput style={[styles.input, { flex: 1 }]} editable={false} value={cryptoDepositAddress || '—'} />
-                  <Pressable style={styles.clearBtn} onPress={() => { if (cryptoDepositAddress) { Clipboard.setString(cryptoDepositAddress); Toast.show({ type: 'success', text1: 'Address copied' }) } }}>
-                    <Text style={styles.clearBtnText}>Copy</Text>
-                  </Pressable>
+                <View style={styles.amountGridCard}>
+                  <View style={styles.amountGrid}>
+                    {AMOUNT_OPTIONS.map(value => (
+                      <Pressable key={value} style={[styles.amountChip, selectedAmount === value && styles.amountChipActive]} onPress={() => { setSelectedAmount(value); setAmountInput(String(value)) }}>
+                        <Text style={[styles.amountChipText, selectedAmount === value && styles.amountChipTextActive]}>+{value.toLocaleString('en-IN')}</Text>
+                      </Pressable>
+                    ))}
+                  </View>
                 </View>
-              </View>
-            ) : (
-              <>
+
                 <View style={styles.block}>
-                  <Text style={styles.blockTitle}>UTR Number / Reference ID (from your payment)</Text>
+                  <Text style={styles.blockTitle}>Enter Amount (INR)</Text>
+                  <Text style={styles.limitText}>Limit: ₹{minAllowed.toLocaleString('en-IN')} - ₹{maxAllowed.toLocaleString('en-IN')}.{transactionLimits?.bonusPercentage != null ? ` Bonus: ${Number(transactionLimits.bonusPercentage)}%.` : ''}</Text>
                   <View style={styles.inputRow}>
                     <TextInput
                       style={[styles.input, { flex: 1 }]}
-                      placeholder="Enter UTR / Reference ID"
+                      placeholder="Enter Amount To Be Deposited"
                       placeholderTextColor="#7f8ca0"
-                      value={utrInput}
-                      onChangeText={setUtrInput}
+                      value={amountInput}
+                      keyboardType="number-pad"
+                      onChangeText={txt => setAmountInput(cleanAmount(txt))}
                     />
-                    <Pressable style={styles.clearBtn} onPress={() => setUtrInput('')}>
+                    <Pressable style={styles.clearBtn} onPress={() => { setAmountInput(''); setSelectedAmount(null) }}>
                       <Text style={styles.clearBtnText}>Clear</Text>
                     </Pressable>
                   </View>
                 </View>
 
-                <View style={styles.block}>
-                  <Text style={styles.blockTitle}>Screenshot (payment proof)</Text>
-                  <Pressable style={styles.uploadBox} onPress={() => setUploadSourceOpen(true)}>
-                    <Text style={styles.uploadIcon}>⇪</Text>
-                    <Text style={styles.uploadText}>{selectedFileName || 'Choose screenshot (optional)'}</Text>
-                  </Pressable>
-                </View>
+                <Pressable style={[styles.nextBtn, (optionsLoading || cryptoAddressLoading) && styles.disabledBtn]} disabled={optionsLoading || cryptoAddressLoading} onPress={() => void handleNext()}>
+                  <Text style={styles.nextBtnText}>{cryptoAddressLoading ? 'Fetching address...' : 'Next'}</Text>
+                </Pressable>
+              </>
+            ) : (
+              <>
+                <Pressable style={styles.backBtn} onPress={() => setStep(1)}>
+                  <Text style={styles.backBtnText}>Back</Text>
+                </Pressable>
+                <Text style={styles.stepTitle}>{selectedPayment === 'crypto' ? 'Deposit to this crypto address' : `Pay to this ${selectedAccount?.type === 'bank' ? 'bank' : 'UPI'} account`}</Text>
+
+                {(selectedAccount?.type === 'upi' || selectedPayment === 'crypto') && qrValue ? (
+                  <View style={styles.qrWrap}>
+                    <Image source={{ uri: makeQrUrl(qrValue) }} style={styles.qrImage} />
+                  </View>
+                ) : null}
+
+                {selectedAccount?.type === 'bank' ? (
+                  <View style={styles.block}>
+                    <View style={styles.row}><Text style={styles.key}>Bank name</Text><Text style={styles.val}>{selectedAccount?.bankName || '—'}</Text></View>
+                    <View style={styles.row}><Text style={styles.key}>Account Holder Name</Text><Text style={styles.val}>{selectedAccount?.accountHolderName || '—'}</Text></View>
+                    <View style={styles.row}><Text style={styles.key}>Account Number</Text><Text style={styles.val}>{selectedAccount?.accountNumber || '—'}</Text></View>
+                    <View style={styles.row}><Text style={styles.key}>IFSC Code</Text><Text style={styles.val}>{selectedAccount?.ifscCode || '—'}</Text></View>
+                  </View>
+                ) : null}
+
+                {selectedAccount?.type === 'bank' ? (
+                  <View style={styles.block}>
+                    <Text style={styles.blockTitle}>Transfer type</Text>
+                    <Pressable
+                      ref={transferRef}
+                      style={styles.selectLike}
+                      onPress={() => {
+                        transferRef.current?.measureInWindow((x, y, width, height) => {
+                          setTransferMenuRect({ top: y + height + 4, left: x, width })
+                          setTransferOpen(true)
+                        })
+                      }}
+                    >
+                      <Text style={styles.selectLikeText}>
+                        {BANK_TRANSFER_OPTIONS.find(opt => opt.value === bankTransferMethod)?.label || 'IMPS'}
+                      </Text>
+                      <Text style={styles.selectLikeChevron}>⌄</Text>
+                    </Pressable>
+                    {transferOpen ? (
+                      <Modal transparent visible={transferOpen} animationType="fade" onRequestClose={() => setTransferOpen(false)}>
+                        <View style={styles.dropdownModalRoot}>
+                          <Pressable style={styles.dropdownBackdrop} onPress={() => setTransferOpen(false)} />
+                          <View style={[styles.dropdownSheet, { top: transferMenuRect.top, left: transferMenuRect.left, width: transferMenuRect.width }]}>
+                            {BANK_TRANSFER_OPTIONS.map(opt => (
+                              <Pressable
+                                key={opt.value}
+                                style={[styles.dropdownRow, bankTransferMethod === opt.value && styles.dropdownRowActive]}
+                                onPress={() => {
+                                  setBankTransferMethod(opt.value)
+                                  setTransferOpen(false)
+                                }}
+                              >
+                                <Text style={[styles.dropdownRowText, bankTransferMethod === opt.value && styles.dropdownRowTextActive]}>{opt.label}</Text>
+                              </Pressable>
+                            ))}
+                          </View>
+                        </View>
+                      </Modal>
+                    ) : null}
+                  </View>
+                ) : null}
+
+                {selectedAccount?.type === 'upi' ? (
+                  <View style={styles.upiCard}>
+                    <Text style={styles.key}>UPI ID :</Text>
+                    <Text style={styles.val}>{selectedAccount?.upiId || '—'}</Text>
+                    <Text style={styles.val}>{selectedAccount?.upiName || ''}</Text>
+                  </View>
+                ) : null}
+
+                {selectedPayment === 'crypto' ? (
+                  <View style={styles.block}>
+                    <Text style={styles.blockTitle}>Deposit Address (BEP20)</Text>
+                    <View style={styles.inputRow}>
+                      <TextInput style={[styles.input, { flex: 1 }]} editable={false} value={cryptoDepositAddress || '—'} />
+                      <Pressable style={styles.clearBtn} onPress={() => { if (cryptoDepositAddress) { Clipboard.setString(cryptoDepositAddress); Toast.show({ type: 'success', text1: 'Address copied' }) } }}>
+                        <Text style={styles.clearBtnText}>Copy</Text>
+                      </Pressable>
+                    </View>
+                  </View>
+                ) : (
+                  <>
+                    <View style={styles.block}>
+                      <Text style={styles.blockTitle}>UTR Number / Reference ID (from your payment)</Text>
+                      <View style={styles.inputRow}>
+                        <TextInput
+                          style={[styles.input, { flex: 1 }]}
+                          placeholder="Enter UTR / Reference ID"
+                          placeholderTextColor="#7f8ca0"
+                          value={utrInput}
+                          onChangeText={setUtrInput}
+                        />
+                        <Pressable style={styles.clearBtn} onPress={() => setUtrInput('')}>
+                          <Text style={styles.clearBtnText}>Clear</Text>
+                        </Pressable>
+                      </View>
+                    </View>
+
+                    <View style={styles.block}>
+                      <Text style={styles.blockTitle}>Screenshot (payment proof)</Text>
+                      <Pressable style={styles.uploadBox} onPress={() => setUploadSourceOpen(true)}>
+                        <Text style={styles.uploadIcon}>⇪</Text>
+                        <Text style={styles.uploadText}>{selectedFileName || 'Choose screenshot (optional)'}</Text>
+                      </Pressable>
+                    </View>
+                  </>
+                )}
+
+                <Text style={styles.noteText}>Note: Please allow up to 30 mins for deposit to credit. For delay, contact support.</Text>
+                <Pressable style={[styles.nextBtn, submitLoading && styles.disabledBtn]} disabled={submitLoading} onPress={() => void handleConfirmPayment()}>
+                  <Text style={styles.nextBtnText}>{submitLoading ? 'Submitting...' : 'Confirm Payment'}</Text>
+                </Pressable>
               </>
             )}
-
-            <Text style={styles.noteText}>Note: Please allow up to 30 mins for deposit to credit. For delay, contact support.</Text>
-            <Pressable style={[styles.nextBtn, submitLoading && styles.disabledBtn]} disabled={submitLoading} onPress={() => void handleConfirmPayment()}>
-              <Text style={styles.nextBtnText}>{submitLoading ? 'Submitting...' : 'Confirm Payment'}</Text>
-            </Pressable>
           </>
         )}
       </ScrollView>
@@ -614,6 +632,25 @@ const styles = StyleSheet.create({
   sourceTitle: { color: '#fff', fontFamily: AppFonts.montserratSemiBold, fontSize: 16 },
   sourceBtn: { borderRadius: 8, borderWidth: 1, borderColor: '#314157', backgroundColor: '#1a2433', paddingVertical: 11, alignItems: 'center' },
   sourceBtnText: { color: '#EAF2FF', fontFamily: AppFonts.montserratSemiBold, fontSize: 14 },
+  demoBanner: {
+    backgroundColor: 'rgba(213,110,42,0.15)',
+    borderColor: '#D56E2A',
+    borderWidth: 1,
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  demoBannerText: {
+    color: '#D56E2A',
+    fontFamily: AppFonts.montserratSemiBold,
+    fontSize: 13,
+  },
+  demoOnlyContainer: {
+    marginTop: 20,
+    gap: 15,
+  },
 })
 
 export default DepositScreen

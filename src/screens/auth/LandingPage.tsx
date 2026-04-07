@@ -988,9 +988,9 @@ export const LandingPage = ({ onOpenLogin, onOpenSignup, onOpenHome, navigation:
             </View>
           ) : (
             <>
-              <MatchSection sportKey="cricket" navigation={finalNav} />
+              {/* <MatchSection sportKey="cricket" navigation={finalNav} />
               <MatchSection sportKey="tennis" navigation={finalNav} />
-              <MatchSection sportKey="soccer" navigation={finalNav} />
+              <MatchSection sportKey="soccer" navigation={finalNav} /> */}
             </>
           )}
         </View>

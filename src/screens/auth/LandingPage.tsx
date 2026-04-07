@@ -62,6 +62,11 @@ import Video, {
 } from 'react-native-video'
 import FastImage from 'react-native-fast-image'
 import { LandingFooter } from '../../components/common/LandingFooter'
+import {
+  formatTimeOnlyIST,
+  getDayGroupIST,
+  resolveEventTimeForIndiaDisplay,
+} from '../../utils/matchTimeIST'
 
 /** Types */
 export interface LandingPageProps {
@@ -128,28 +133,7 @@ const toAbsoluteImageUrl = (rawUrl: string) => {
   return resolvedUrl
 }
 
-function getDayGroup(isoStr: string | undefined): string {
-  if (!isoStr) return ''
-  try {
-    const d = new Date(isoStr)
-    if (isNaN(d.getTime())) return ''
-    const today = new Date()
-    const tomorrow = new Date(today)
-    tomorrow.setDate(tomorrow.getDate() + 1)
-    if (d.toDateString() === today.toDateString()) return 'Today'
-    if (d.toDateString() === tomorrow.toDateString()) return 'Tomorrow'
-    return d.toLocaleDateString('en-IN', { weekday: 'long' })
-  } catch {
-    return ''
-  }
-}
-
-function formatTimeOnly(input: unknown): string {
-  if (typeof input !== 'string' || !input) return '--:--'
-  const d = new Date(input)
-  if (Number.isNaN(d.getTime())) return '--:--'
-  return d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true }).toLowerCase()
-}
+// --- Removed local time formatters in favor of matchTimeIST ---
 
 const mapMatchDataRowsToTopMatches = (matches: any[], defaults: { tournament: string }): SportsbookMatch[] => {
   if (!Array.isArray(matches)) return []
@@ -162,7 +146,7 @@ const mapMatchDataRowsToTopMatches = (matches: any[], defaults: { tournament: st
     .map((r: any) => {
       const gid = String(r.gameId ?? r.eventId)
       const rawTime = pickMatchEventTime(r)
-      const et = rawTime != null ? normalizeMatchDataEventTime(rawTime) : null
+      const et = resolveEventTimeForIndiaDisplay(rawTime)
       const mid = r.marketId
       const ev =
         r.eventName ??
@@ -208,7 +192,7 @@ const mapSocketRowsToTopMatches = (rows: any[], tournament: string): SportsbookM
       const id = m.gameId ?? m.game_id ?? m.eventId ?? m.event_id
       if (!id) return null
       const raw = m.eventTime ?? m.event_time ?? pickMatchEventTime(m)
-      const et = raw != null ? normalizeMatchDataEventTime(raw) ?? raw : undefined
+      const et = resolveEventTimeForIndiaDisplay(raw) ?? undefined
       return {
         gameId: m.gameId ?? m.game_id ?? String(id),
         game_id: m.game_id ?? m.gameId ?? String(id),
@@ -301,9 +285,9 @@ const MatchTeamRow = memo(({ row, eventTime, leftClusterW, onPress }: { row: Spo
       <View style={[styles.matchRowLeft, { width: leftClusterW, height: LANDING_ROW_H, borderBottomWidth: 1, borderBottomColor: '#1c2f4a' }]}>
         <View style={styles.matchMeta}>
           <Text style={styles.matchMetaDay}>
-            {getDayGroup(typeof eventTime === 'string' ? eventTime : undefined) || 'Today'}
+            {getDayGroupIST(eventTime) || 'Today'}
           </Text>
-          <Text style={styles.matchMetaClock}>{formatTimeOnly(eventTime)}</Text>
+          <Text style={styles.matchMetaClock}>{formatTimeOnlyIST(eventTime) || '--:--'}</Text>
           {row.inPlay ?? (row as any).in_play ? <Text style={styles.liveTagStatic}>LIVE</Text> : null}
         </View>
         <View style={styles.matchTeamsBox}>

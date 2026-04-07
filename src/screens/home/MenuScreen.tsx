@@ -1,4 +1,5 @@
 import React from 'react'
+import Toast from 'react-native-toast-message'
 import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { useNavigationState } from '@react-navigation/native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -70,7 +71,7 @@ const MenuScreen = ({ navigation }: any) => {
     { key: 'wallet', label: 'My Wallet', icon: ImageAssets.walletfill, onPress: () => openAction('MyWallet'), authOnly: true },
     { key: 'statement', label: 'Account Statement', icon: ImageAssets.bankfill, onPress: () => openAction('AccountStatement'), authOnly: true },
     { key: 'support', label: 'Live Support', icon: ImageAssets.customerSupport, onPress: () => openAction('Support'), authOnly: true },
-    { key: 'notifications', label: 'Notifications', icon: ImageAssets.promotion, onPress: () => { }, authOnly: true },
+    { key: 'notifications', label: 'Notifications', icon: ImageAssets.promotion, onPress: () => { Toast.show({ type: 'info', text1: 'Coming Soon' }) }, authOnly: true },
   ]
 
   return (

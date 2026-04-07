@@ -1,5 +1,8 @@
 #!/bin/sh
 
+# Export PATH to include common node locations for Gradle tasks
+export PATH=$PATH:/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin
+
 #
 # Copyright © 2015 the original authors.
 #

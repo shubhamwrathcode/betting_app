@@ -6,6 +6,7 @@ buildscript {
         targetSdkVersion = 36
         ndkVersion = "27.1.12297006"
         kotlinVersion = "2.1.20"
+        REACT_NATIVE_NODE_MODULES_DIR = file("${rootDir}/../node_modules/react-native").absolutePath
     }
     repositories {
         google()
@@ -19,3 +20,39 @@ buildscript {
 }
 
 apply plugin: "com.facebook.react.rootproject"
+
+allprojects {
+    repositories {
+        google()
+        mavenCentral()
+    }
+}
+
+subprojects {
+    def applyAndroidConfig = { proj ->
+        if (proj.hasProperty('android')) {
+            proj.android {
+                // Ensure compileSdk is set (required by AGP 8+)
+                compileSdk rootProject.ext.compileSdkVersion
+                buildToolsVersion rootProject.ext.buildToolsVersion
+
+                defaultConfig {
+                    if (minSdkVersion == null) {
+                        minSdkVersion rootProject.ext.minSdkVersion
+                    }
+                    if (targetSdkVersion == null) {
+                        targetSdkVersion rootProject.ext.targetSdkVersion
+                    }
+                }
+            }
+        }
+    }
+
+    if (project.state.executed) {
+        applyAndroidConfig(project)
+    } else {
+        project.afterEvaluate { proj ->
+            applyAndroidConfig(proj)
+        }
+    }
+}

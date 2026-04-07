@@ -32,6 +32,11 @@ import {
   unsubscribeMatchDataLandingAll,
 } from '../../socket/matchDataSocket'
 import { normalizeMatchDataEventTime, pickMatchEventTime } from '../../utils/matchDataNormalize'
+import {
+  formatTimeOnlyIST,
+  getDayGroupIST,
+  resolveEventTimeForIndiaDisplay,
+} from '../../utils/matchTimeIST'
 
 type SportTab = 'cricket' | 'tennis' | 'soccer' | 'sportsbook'
 type TabId = SportTab
@@ -112,28 +117,7 @@ const marketPillCodesForRow = (row: MatchItem): string[] => {
   return out
 }
 
-const formatTimeOnly = (raw?: string) => {
-  if (!raw) return ''
-  const d = new Date(raw)
-  if (Number.isNaN(d.getTime())) return ''
-  return d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true }).toLowerCase()
-}
-
-const getDayGroup = (raw?: string) => {
-  if (!raw) return ''
-  try {
-    const d = new Date(raw)
-    if (Number.isNaN(d.getTime())) return ''
-    const today = new Date()
-    const tomorrow = new Date(today)
-    tomorrow.setDate(tomorrow.getDate() + 1)
-    if (d.toDateString() === today.toDateString()) return 'Today'
-    if (d.toDateString() === tomorrow.toDateString()) return 'Tomorrow'
-    return d.toLocaleDateString('en-IN', { weekday: 'long' })
-  } catch {
-    return ''
-  }
-}
+// --- Local time formatters removed in favor of matchTimeIST ---
 
 const hasTag = (match: MatchItem, tag: string) => {
   const badges = Array.isArray(match?.marketBadges) ? match.marketBadges.join(' ') : ''
@@ -157,8 +141,8 @@ const sortInPlayMatches = (list: MatchItem[]) => {
     const aLive = isLiveMatch(a);
     const bLive = isLiveMatch(b);
     if (aLive !== bLive) return aLive ? -1 : 1;
-    const dateA = new Date(a.eventTime || a.event_time || a.startTime || 0).getTime();
-    const dateB = new Date(b.eventTime || b.event_time || b.startTime || 0).getTime();
+    const dateA = resolveEventTimeForIndiaDisplay(a.eventTime || a.event_time || a.startTime) || 0;
+    const dateB = resolveEventTimeForIndiaDisplay(b.eventTime || b.event_time || b.startTime) || 0;
     return dateA - dateB;
   })
 }
@@ -197,7 +181,7 @@ const OddsCell = memo(({ side, pair, isLast }: { side: 'back' | 'lay'; pair: Lan
 })
 
 const InPlayTeamRow = memo(({ row, eventTime, leftW, metaW, onPress }: { row: MatchItem, eventTime: any, leftW: number, metaW: number, onPress: () => void }) => {
-  const timeRaw = typeof eventTime === 'string' ? eventTime : undefined
+  const timeVal = eventTime
   const pills = marketPillCodesForRow(row)
   const { line1, line2 } = splitEventTitleLines(row.eventName || row.event_name || row.name || row.teams)
 
@@ -205,8 +189,8 @@ const InPlayTeamRow = memo(({ row, eventTime, leftW, metaW, onPress }: { row: Ma
     <Pressable style={[styles.matchRow, { minHeight: ROW_H, width: leftW }]} onPress={onPress}>
       <View style={[styles.matchMeta, { width: metaW }]}>
         {isLiveMatch(row) ? <Text style={styles.liveMini}>LIVE</Text> : null}
-        <Text style={styles.dayText} numberOfLines={1}>{getDayGroup(timeRaw) || 'Today'}</Text>
-        <Text style={styles.clockText} numberOfLines={1}>{formatTimeOnly(timeRaw)}</Text>
+        <Text style={styles.dayText} numberOfLines={1}>{getDayGroupIST(timeVal) || 'Today'}</Text>
+        <Text style={styles.clockText} numberOfLines={1}>{formatTimeOnlyIST(timeVal) || '--:--'}</Text>
       </View>
       <View style={styles.matchTeamsBox}>
         <View style={styles.matchInfoTitleRow}>
@@ -310,7 +294,7 @@ const InPlayScreen = () => {
       const mapped = matches.filter(r => r && typeof r === 'object').map((r: any) => {
         const gid = String(r.gameId ?? r.eventId ?? '')
         const rawTime = pickMatchEventTime(r)
-        const et = rawTime != null ? normalizeMatchDataEventTime(rawTime) : null
+        const et = resolveEventTimeForIndiaDisplay(rawTime)
         return {
           gameId: gid || undefined, eventId: gid || undefined,
           eventName: r.eventName ?? r.event_name ?? r.name ?? r.teams ?? '—',
@@ -384,7 +368,7 @@ const InPlayScreen = () => {
 
   const rowsPrep = useMemo(() => {
     return activeMatches.map((row, idx) => {
-      const eventTime = row.eventTime ?? row.event_time ?? row.startTime
+      const eventTime = resolveEventTimeForIndiaDisplay(row.eventTime ?? row.event_time ?? row.startTime)
       const oddsPayload = Array.isArray(row.matchOdds) && row.matchOdds.length > 0 ? { matchOdds: row.matchOdds } : null
       const stripCols = getLandingOddsStripColumns(
         { ...row, teams: row.teams ?? row.eventName ?? row.event_name ?? row.name },

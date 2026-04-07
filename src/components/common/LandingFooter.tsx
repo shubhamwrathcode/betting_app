@@ -36,7 +36,7 @@ export const LandingFooter = () => {
         const isLast = footerSections.indexOf(title) === footerSections.length - 1
         return (
           <View key={title} style={[styles.footerSection, isLast && { borderBottomWidth: 0 }]}>
-            <Pressable
+            {/* <Pressable
               style={styles.footerHeading}
               onPress={() => {
                 LayoutAnimation.configureNext({
@@ -67,7 +67,7 @@ export const LandingFooter = () => {
                   </Text>
                 ))}
               </View>
-            )}
+            )} */}
           </View>
         )
       })}

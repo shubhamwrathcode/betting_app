@@ -86,6 +86,17 @@ const heroSlides = [
   { id: 7, image: ImageAssets.homeBnr7Png, heading: 'Casino & Sports Hub', subContent: 'Bet Every Ball. Play Every Moment. Win Bigger.', navigateTo: 'Casino' },
 ]
 
+const topSportsItems = [
+  { id: 1, title: 'Cricket', icon: ImageAssets.menuIcon19Svg, to: 'InPlay' },
+  { id: 2, title: 'Football', icon: ImageAssets.football, to: 'InPlay' },
+  { id: 3, title: 'Tennis', icon: ImageAssets.tennisIconSvg, to: 'InPlay' },
+  { id: 4, title: 'Basketball', icon: ImageAssets.basketballIconSvg, to: 'SportsBook' },
+  { id: 5, title: 'Baseball', icon: ImageAssets.menuIcon2Svg, to: 'SportsBook' },
+  { id: 6, title: 'Horse Racing', icon: ImageAssets.horseIconSvg, to: 'SportsBook' },
+  { id: 7, title: 'Ice Hockey', icon: ImageAssets.menuIcon10Svg, to: 'SportsBook' },
+  { id: 8, title: 'Futsal', icon: ImageAssets.menuIcon14Svg, to: 'SportsBook' },
+]
+
 const trendingCategories = [
   { name: 'Aviator', image: ImageAssets.aviatorImgPng, video: ImageAssets.vidAviator },
   { name: 'Dragon Tiger', image: ImageAssets.betcasinoImg4Png, video: ImageAssets.vidDragonTiger },
@@ -330,7 +341,7 @@ const MatchTeamRow = memo(({ row, eventTime, leftClusterW, onPress }: { row: Spo
           <Text style={styles.matchMetaDay}>
             {getDayGroupIST(eventTime) || 'Today'}
           </Text>
-          <Text style={styles.matchMetaClock}>{formatTimeOnlyIST(eventTime) || '--:--'}</Text>
+          <Text style={styles.matchMetaTime} numberOfLines={1}>{formatTimeOnlyIST(eventTime) || '--:--'}</Text>
           {row.inPlay ?? (row as any).in_play ? <Text style={styles.liveTagStatic}>LIVE</Text> : null}
         </View>
         <View style={styles.matchTeamsBox}>
@@ -707,6 +718,31 @@ const TopStrip = memo(({ markVideoFailed, videoFailedSet }: {
   );
 });
 
+const TopSportsSection = memo(({ navigation }: { navigation: any }) => {
+  return (
+    <View style={styles.topSportsWrapper}>
+      <View style={styles.topSportsHeader}>
+        <Text style={styles.topSportsTitle}>TOP Sports</Text>
+        <TouchableOpacity onPress={() => navigation.navigate('SportsBook')}>
+          <View style={styles.topSportsGoBtn}>
+            <Text style={styles.topSportsGoText}>Go to Sportsbook</Text>
+          </View>
+        </TouchableOpacity>
+      </View>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.topSportsList}>
+        {topSportsItems.map(item => (
+          <TouchableOpacity key={item.id} style={styles.topSportsItem} onPress={() => navigation.navigate(item.to)}>
+            <View style={styles.topSportsIconBox}>
+              <Image source={item.icon} style={styles.topSportsIcon} resizeMode="contain" />
+            </View>
+            <Text style={styles.topSportsItemTitle} numberOfLines={1}>{item.title}</Text>
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
+    </View>
+  )
+})
+
 export const LandingPage = ({ onOpenLogin, onOpenSignup, onOpenHome, navigation: propsNav }: LandingPageProps) => {
   const { isAuthenticated } = useAuth()
   const navigation = useNavigation<any>()
@@ -922,6 +958,8 @@ export const LandingPage = ({ onOpenLogin, onOpenSignup, onOpenHome, navigation:
 
           <TopStrip markVideoFailed={name => setStripVideoFailed(p => new Set(p).add(name))} videoFailedSet={stripVideoFailed} />
 
+          {/* <TopSportsSection navigation={finalNav} /> */}
+
           {gamesLoading ? <ActivityIndicator style={{ marginTop: 20 }} color={colors.accent} /> : [
             { title: 'Trending Games', items: landingGames.trending },
             { title: 'Roulette', items: landingGames.roulette },
@@ -1053,7 +1091,17 @@ const styles = StyleSheet.create({
   liveTag: { color: '#FFF', backgroundColor: '#D4322E', fontSize: 9, fontFamily: AppFonts.montserratExtraBold, alignSelf: 'flex-start', paddingHorizontal: 5, paddingVertical: 2, borderRadius: 3, marginBottom: 6, overflow: 'hidden' },
   liveTagStatic: { color: '#FFF', backgroundColor: '#D4322E', fontSize: 9, fontFamily: AppFonts.montserratExtraBold, alignSelf: 'flex-start', paddingHorizontal: 5, paddingVertical: 2, borderRadius: 3, marginTop: 4, overflow: 'hidden' },
   matchMetaDay: { color: '#9CA3AF', fontSize: 10, fontFamily: AppFonts.montserratRegular, marginBottom: 2 },
-  matchMetaClock: { color: '#E5E7EB', fontSize: 12, fontFamily: AppFonts.montserratSemiBold },
+  matchMetaTime: { color: '#FFFFFF', fontSize: 10, fontFamily: AppFonts.montserratSemiBold },
+  topSportsWrapper: { marginTop: 20, marginBottom: 10, paddingHorizontal: 12 },
+  topSportsHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
+  topSportsTitle: { color: '#FFFFFF', fontSize: 18, fontFamily: AppFonts.montserratBold },
+  topSportsGoBtn: { backgroundColor: '#D5702A', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 6 },
+  topSportsGoText: { color: '#FFF', fontSize: 12, fontFamily: AppFonts.montserratSemiBold },
+  topSportsList: { paddingRight: 20 },
+  topSportsItem: { width: 100, alignItems: 'center', marginRight: 15 },
+  topSportsIconBox: { width: 80, height: 80, backgroundColor: '#132238', borderRadius: 12, alignItems: 'center', justifyContent: 'center', marginBottom: 8, borderWidth: 1, borderColor: '#1c2f4a' },
+  topSportsIcon: { width: 44, height: 44 },
+  topSportsItemTitle: { color: '#FFFFFF', fontSize: 13, fontFamily: AppFonts.montserratSemiBold, textAlign: 'center' },
   matchTeamsBox: { flex: 1, paddingVertical: 10, paddingHorizontal: 12, justifyContent: 'center' },
   matchInfoTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 },
   marketPillsRow: { flexDirection: 'row', gap: 4 },

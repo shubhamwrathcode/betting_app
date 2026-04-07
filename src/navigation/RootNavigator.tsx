@@ -11,19 +11,6 @@ import CasinoScreen from '../screens/home/CasinoScreen'
 import InPlayScreen from '../screens/home/InPlayScreen'
 import SportsbookScreen from '../screens/home/SportsbookScreen'
 import SearchScreen from '../screens/home/SearchScreen'
-import GameRulesScreen from '../screens/home/GameRulesScreen'
-import PromotionsScreen from '../screens/home/PromotionsScreen'
-import ReferralRewardsScreen from '../screens/home/ReferralRewardsScreen'
-import TransactionsScreen from '../screens/home/TransactionsScreen'
-import MyBetsScreen from '../screens/home/MyBetsScreen'
-import BetHistoryScreen from '../screens/home/BetHistoryScreen'
-import GameHistoryScreen from '../screens/home/GameHistoryScreen'
-import MyWalletScreen from '../screens/home/MyWalletScreen'
-import BettingProfitLossScreen from '../screens/home/BettingProfitLossScreen'
-import AccountStatementScreen from '../screens/home/AccountStatementScreen'
-import SupportScreen from '../screens/home/SupportScreen'
-import DepositScreen from '../screens/home/DepositScreen'
-import WithdrawalScreen from '../screens/home/WithdrawalScreen'
 import MyProfileScreen from '../screens/home/MyProfileScreen'
 import AddAccountScreen from '../screens/home/AddAccountScreen'
 import MenuScreen from '../screens/home/MenuScreen'
@@ -68,53 +55,40 @@ const TabsNavigator = (props: any) => {
         listeners={({ navigation }) => ({
           tabPress: e => {
             e.preventDefault()
-            navigation.dispatch(DrawerActions.openDrawer())
+            navigation.dispatch(DrawerActions.toggleDrawer())
           },
         })}
       />
       <Tab.Screen name="Casino" component={CasinoScreen} />
-      <Tab.Screen
-        name="Home"
-        children={() => (
-          <LandingPage
-            onOpenLogin={() => props.navigation.navigate('Login', { initialTab: 'login' })}
-            onOpenSignup={() => props.navigation.navigate('Login', { initialTab: 'signup' })}
-            onOpenHome={() => props.navigation.navigate('Login', { initialTab: 'login' })}
+      <Tab.Screen 
+        name="Home" 
+        component={(navProps: any) => (
+          <LandingPage 
+            onOpenLogin={() => navProps.navigation.navigate('Login')}
+            onOpenSignup={() => navProps.navigation.navigate('Login', { initialTab: 'signup' })}
+            onOpenHome={() => navProps.navigation.navigate('Login')}
           />
         )}
       />
       <Tab.Screen name="InPlay" component={InPlayScreen} />
       <Tab.Screen name="SportsBook" component={SportsbookScreen} />
-      <Tab.Screen name="GameRules" component={GameRulesScreen} />
-      <Tab.Screen name="Promotions" component={PromotionsScreen} />
-      <Tab.Screen name="ReferralRewards" component={ReferralRewardsScreen} />
-      <Tab.Screen name="Transactions" component={TransactionsScreen} />
-      <Tab.Screen name="MyBets" component={MyBetsScreen} />
-      <Tab.Screen name="BetHistory" component={BetHistoryScreen} />
-      <Tab.Screen name="GameHistory" component={GameHistoryScreen} />
-      <Tab.Screen name="MyWallet" component={MyWalletScreen} />
-      <Tab.Screen name="BettingProfitLoss" component={BettingProfitLossScreen} />
-      <Tab.Screen name="AccountStatement" component={AccountStatementScreen} />
-      <Tab.Screen name="Support" component={SupportScreen} />
-      <Tab.Screen name="Deposit" component={DepositScreen} />
-      <Tab.Screen name="Withdrawal" component={WithdrawalScreen} />
     </Tab.Navigator>
   )
 }
 
-const MainTabs = (props: any) => (
+const MainAppWithDrawer = (props: any) => (
   <Drawer.Navigator
     screenOptions={{
       headerShown: false,
       drawerPosition: 'left',
       drawerType: 'front',
-      overlayColor: 'transparent',
-      drawerStyle: { width: '100%', backgroundColor: 'transparent' },
+      overlayColor: 'rgba(0,0,0,0.5)', // Now using a proper overlay since it's on top
+      drawerStyle: { width: '80%', backgroundColor: '#132238' },
     }}
     drawerContent={({ navigation }) => <MenuScreen navigation={navigation} />}
   >
     <Drawer.Screen name="Tabs">
-      {() => <TabsNavigator {...props} />}
+      {(drawerProps) => <TabsNavigator {...drawerProps} />}
     </Drawer.Screen>
   </Drawer.Navigator>
 )
@@ -132,7 +106,7 @@ export const RootNavigator = () => {
 
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="MainTabs" component={MainTabs} />
+      <Stack.Screen name="MainTabs" component={MainAppWithDrawer} />
       <Stack.Screen name="Login" component={LoginPage} />
       <Stack.Screen name="ForgotPassword" component={ForgotPasswordPage} />
       <Stack.Screen name="Game" component={GameScreen} />
@@ -150,4 +124,3 @@ export const RootNavigator = () => {
     </Stack.Navigator>
   )
 }
-

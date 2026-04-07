@@ -1,5 +1,6 @@
 import React from 'react'
 import { StyleSheet, Text, View, Pressable, Image, Platform } from 'react-native'
+import { DrawerActions } from '@react-navigation/native'
 import { ImageAssets } from '../ImageAssets'
 import { AppFonts } from '../AppFonts'
 import { BottomTabBarProps } from '@react-navigation/bottom-tabs'
@@ -14,7 +15,7 @@ const tabsConfig: Record<string, { label: string, Icon: any }> = {
 
 export const BottomTab = ({ state, descriptors, navigation }: BottomTabBarProps) => {
   const focusedRoute = state.routes[state.index]
-  const focusedOptions = descriptors[focusedRoute.key]?.options
+  const focusedOptions = descriptors?.[focusedRoute.key]?.options
   const focusedTabStyle = focusedOptions?.tabBarStyle as { display?: string } | undefined
   if (focusedTabStyle?.display === 'none') return null
 
@@ -25,13 +26,13 @@ export const BottomTab = ({ state, descriptors, navigation }: BottomTabBarProps)
       <View style={styles.navRow}>
         {barRoutes.map(route => {
           const index = state.routes.indexOf(route)
-          const { options } = descriptors[route.key]
+          const options = descriptors?.[route.key]?.options
           const label =
-            options.tabBarLabel !== undefined
+            options?.tabBarLabel !== undefined
               ? options.tabBarLabel
-              : options.title !== undefined
+              : options?.title !== undefined
                 ? options.title
-                : route.name
+                : tabsConfig[route.name]?.label ?? route.name
 
           const isFocused = state.index === index
 
@@ -42,8 +43,11 @@ export const BottomTab = ({ state, descriptors, navigation }: BottomTabBarProps)
               canPreventDefault: true,
             })
 
-            if (!isFocused && !event.defaultPrevented) {
-              navigation.navigate(route.name)
+            if (!event.defaultPrevented) {
+              navigation.dispatch(DrawerActions.closeDrawer())
+              if (!isFocused) {
+                navigation.navigate(route.name)
+              }
             }
           }
 
@@ -63,7 +67,7 @@ export const BottomTab = ({ state, descriptors, navigation }: BottomTabBarProps)
               key={route.key}
               accessibilityRole="button"
               accessibilityState={isFocused ? { selected: true } : {}}
-              accessibilityLabel={options.tabBarAccessibilityLabel}
+              accessibilityLabel={options?.tabBarAccessibilityLabel}
               onPress={onPress}
               onLongPress={onLongPress}
               style={styles.tabItem}

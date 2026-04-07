@@ -15,6 +15,7 @@ type MenuItem = {
 }
 
 const TAB_NAME_TO_MENU_KEY: Record<string, string> = {
+  Home: 'home',
   Casino: 'casino',
   InPlay: 'inplay',
   SportsBook: 'sportsbook',
@@ -23,7 +24,6 @@ const TAB_NAME_TO_MENU_KEY: Record<string, string> = {
   BetHistory: 'bethistory',
   GameHistory: 'gamehistory',
   MyWallet: 'wallet',
-  BettingProfitLoss: 'pl',
   AccountStatement: 'statement',
   Support: 'support',
   Deposit: 'deposit',
@@ -38,20 +38,12 @@ function getFocusedTabScreenName(drawerState: any): string | undefined {
   return tabState.routes[idx]?.name
 }
 
-/** Tab to restore when leaving Game Rules / Promotions (hidden tab bar routes). */
-function getReturnTabNameForAuxScreens(navState: any): string {
-  const name = getFocusedTabScreenName(navState)
-  if (!name || name === 'Menu' || name === 'GameRules' || name === 'Promotions' || name === 'ReferralRewards' || name === 'Transactions' || name === 'MyBets' || name === 'BetHistory' || name === 'GameHistory' || name === 'MyWallet' || name === 'BettingProfitLoss' || name === 'AccountStatement' || name === 'Support' || name === 'Deposit' || name === 'Withdrawal')
-    return 'Home'
-  return name
-}
-
 const MenuScreen = ({ navigation }: any) => {
   const insets = useSafeAreaInsets()
   const { isAuthenticated } = useAuth()
   const activeMenuKey = useNavigationState(state => {
     const tabName = getFocusedTabScreenName(state)
-    return tabName ? TAB_NAME_TO_MENU_KEY[tabName] : null
+    return tabName ? TAB_NAME_TO_MENU_KEY[tabName] : 'home'
   })
 
   const goToTab = (screen: string) => {
@@ -59,146 +51,53 @@ const MenuScreen = ({ navigation }: any) => {
     navigation.closeDrawer()
   }
 
-  const openGameRules = () => {
-    const returnToTab = getReturnTabNameForAuxScreens(navigation.getState())
+  const openAction = (screen: string) => {
     navigation.closeDrawer()
-    navigation.navigate('Tabs', { screen: 'GameRules', params: { returnToTab } })
+    navigation.navigate('Tabs', { screen: screen })
   }
 
-  const openPromotions = () => {
-    const returnToTab = getReturnTabNameForAuxScreens(navigation.getState())
-    navigation.closeDrawer()
-    navigation.navigate('Tabs', { screen: 'Promotions', params: { returnToTab } })
-  }
-
-  const openReferralRewards = () => {
-    const returnToTab = getReturnTabNameForAuxScreens(navigation.getState())
-    navigation.closeDrawer()
-    navigation.navigate('Tabs', { screen: 'ReferralRewards', params: { returnToTab } })
-  }
-
-  const openTransactions = () => {
-    const returnToTab = getReturnTabNameForAuxScreens(navigation.getState())
-    navigation.closeDrawer()
-    navigation.navigate('Tabs', { screen: 'Transactions', params: { returnToTab } })
-  }
-
-  const openMyBets = () => {
-    const returnToTab = getReturnTabNameForAuxScreens(navigation.getState())
-    navigation.closeDrawer()
-    navigation.navigate('Tabs', { screen: 'MyBets', params: { returnToTab } })
-  }
-
-  const openBetHistory = () => {
-    const returnToTab = getReturnTabNameForAuxScreens(navigation.getState())
-    navigation.closeDrawer()
-    navigation.navigate('Tabs', { screen: 'BetHistory', params: { returnToTab } })
-  }
-
-  const openGameHistory = () => {
-    const returnToTab = getReturnTabNameForAuxScreens(navigation.getState())
-    navigation.closeDrawer()
-    navigation.navigate('Tabs', { screen: 'GameHistory', params: { returnToTab } })
-  }
-
-  const openMyWallet = () => {
-    const returnToTab = getReturnTabNameForAuxScreens(navigation.getState())
-    navigation.closeDrawer()
-    navigation.navigate('Tabs', { screen: 'MyWallet', params: { returnToTab } })
-  }
-
-  const openBettingProfitLoss = () => {
-    const returnToTab = getReturnTabNameForAuxScreens(navigation.getState())
-    navigation.closeDrawer()
-    navigation.navigate('Tabs', { screen: 'BettingProfitLoss', params: { returnToTab } })
-  }
-
-  const openAccountStatement = () => {
-    const returnToTab = getReturnTabNameForAuxScreens(navigation.getState())
-    navigation.closeDrawer()
-    navigation.navigate('Tabs', { screen: 'AccountStatement', params: { returnToTab } })
-  }
-
-  const openSupport = () => {
-    const returnToTab = getReturnTabNameForAuxScreens(navigation.getState())
-    navigation.closeDrawer()
-    navigation.navigate('Tabs', { screen: 'Support', params: { returnToTab } })
-  }
-
-  const openDeposit = () => {
-    if (!isAuthenticated) {
-      navigation.closeDrawer()
-      navigation.navigate('Login', { initialTab: 'login' })
-      return
-    }
-    const returnToTab = getReturnTabNameForAuxScreens(navigation.getState())
-    navigation.closeDrawer()
-    navigation.navigate('Tabs', { screen: 'Deposit', params: { returnToTab } })
-  }
-
-  const openWithdrawal = () => {
-    if (!isAuthenticated) {
-      navigation.closeDrawer()
-      navigation.navigate('Login', { initialTab: 'login' })
-      return
-    }
-    const returnToTab = getReturnTabNameForAuxScreens(navigation.getState())
-    navigation.closeDrawer()
-    navigation.navigate('Tabs', { screen: 'Withdrawal', params: { returnToTab } })
-  }
-
-  const openAddAccount = () => {
-    if (!isAuthenticated) {
-      navigation.closeDrawer()
-      navigation.navigate('Login', { initialTab: 'login' })
-      return
-    }
-    navigation.closeDrawer()
-    navigation.navigate('AddAccount')
-  }
-
-  const allMenuItems: (MenuItem & { authOnly?: boolean })[] = [
+  const menuItems: (MenuItem & { authOnly?: boolean })[] = [
+    { key: 'home', label: 'Home', icon: ImageAssets.homeline, onPress: () => goToTab('Home') },
     { key: 'casino', label: 'Casino', icon: ImageAssets.spade, onPress: () => goToTab('Casino') },
     { key: 'inplay', label: 'InPlay', icon: ImageAssets.gamepad, onPress: () => goToTab('InPlay') },
     { key: 'sportsbook', label: 'SportsBook', icon: ImageAssets.basketballFill, onPress: () => goToTab('SportsBook') },
-    { key: 'rules', label: 'Game Rules', icon: ImageAssets.bookopenfill, onPress: openGameRules },
-    { key: 'promotions', label: 'Promotions', icon: ImageAssets.promotion, onPress: openPromotions },
-    { key: 'referral', label: 'Referral', icon: ImageAssets.Referal, onPress: openReferralRewards, authOnly: true },
-    { key: 'transactions', label: 'Transactions', icon: ImageAssets.transactionMenu, onPress: openTransactions, authOnly: true },
-    { key: 'mybets', label: 'My Bets', icon: ImageAssets.flagBets, onPress: openMyBets, authOnly: true },
-    { key: 'bethistory', label: 'Bet History', icon: ImageAssets.bethistory, onPress: openBetHistory, authOnly: true },
-    { key: 'gamehistory', label: 'Game History', icon: ImageAssets.gamepad, onPress: openGameHistory, authOnly: true },
-    { key: 'wallet', label: 'My Wallet', icon: ImageAssets.walletfill, onPress: openMyWallet, authOnly: true },
-    { key: 'bankaccounts', label: 'Bank accounts', icon: ImageAssets.bankfill, onPress: openAddAccount, authOnly: true },
-    { key: 'pl', label: 'Betting P&L', icon: ImageAssets.linechart, onPress: openBettingProfitLoss, authOnly: true },
-    { key: 'statement', label: 'Account Statement', icon: ImageAssets.bankfill, onPress: openAccountStatement, authOnly: true },
-    { key: 'support', label: 'Live Support', icon: ImageAssets.customerSupport, onPress: openSupport, authOnly: true },
+    { key: 'rules', label: 'Game Rules', icon: ImageAssets.bookopenfill, onPress: () => openAction('GameRules') },
+    { key: 'referral', label: 'Referral', icon: ImageAssets.Referal, onPress: () => openAction('ReferralRewards'), authOnly: true },
+    { key: 'transactions', label: 'Transactions', icon: ImageAssets.transactionMenu, onPress: () => openAction('Transactions'), authOnly: true },
+    { key: 'mybets', label: 'My Bets', icon: ImageAssets.flagBets, onPress: () => openAction('MyBets'), authOnly: true },
+    { key: 'bethistory', label: 'Bet History', icon: ImageAssets.bethistory, onPress: () => openAction('BetHistory'), authOnly: true },
+    { key: 'gamehistory', label: 'Game History', icon: ImageAssets.gamepad, onPress: () => openAction('GameHistory'), authOnly: true },
+    { key: 'wallet', label: 'My Wallet', icon: ImageAssets.walletfill, onPress: () => openAction('MyWallet'), authOnly: true },
+    { key: 'statement', label: 'Account Statement', icon: ImageAssets.bankfill, onPress: () => openAction('AccountStatement'), authOnly: true },
+    { key: 'support', label: 'Live Support', icon: ImageAssets.customerSupport, onPress: () => openAction('Support'), authOnly: true },
+    { key: 'notifications', label: 'Notifications', icon: ImageAssets.promotion, onPress: () => { }, authOnly: true },
   ]
-  const menuItems = allMenuItems
 
   return (
     <View style={styles.screen}>
-      <View style={[styles.drawer, { paddingTop: insets.top + 8 }]}>
+      <View style={[styles.drawer, { paddingTop: insets.top + 16 }]}>
+        {/* Buttons Row */}
         <View style={styles.ctaRow}>
           <PrimaryButton
             title="Deposit"
-            onPress={openDeposit}
+            onPress={() => openAction('Deposit')}
             colors={['#2B9454', '#1F7E46']}
-            style={StyleSheet.flatten([styles.ctaBtn, styles.depositBtn])}
+            style={styles.ctaBtn}
             textStyle={styles.ctaText}
-            leftIcon={<Image source={ImageAssets.walletfill} tintColor={'#FFFFFF'} style={{width: 16, height: 16}} />}
+            leftIcon={<Image source={ImageAssets.walletfill} tintColor={'#FFFFFF'} style={styles.btnIcon} />}
           />
           <PrimaryButton
             title="Withdraw"
-            onPress={openWithdrawal}
+            onPress={() => openAction('Withdrawal')}
             colors={['#F17B31', '#CD6828']}
-            style={StyleSheet.flatten([styles.ctaBtn, styles.withdrawBtn])}
+            style={styles.ctaBtn}
             textStyle={styles.ctaText}
-            leftIcon={<Image source={ImageAssets.bankfill} tintColor={'#FFFFFF'} style={{width: 16, height: 16}} />}
+            leftIcon={<Image source={ImageAssets.bankfill} tintColor={'#FFFFFF'} style={styles.btnIcon} />}
           />
         </View>
 
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.menuList}>
+        {/* Menu List */}
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.listContainer}>
           {menuItems.map(item => {
             const active = item.key === activeMenuKey
             return (
@@ -209,9 +108,9 @@ const MenuScreen = ({ navigation }: any) => {
                   if (item.authOnly && !isAuthenticated) {
                     navigation.closeDrawer()
                     navigation.navigate('Login', { initialTab: 'login' })
-                    return
+                  } else {
+                    item.onPress()
                   }
-                  item.onPress()
                 }}
               >
                 <View style={styles.iconBox}>
@@ -223,61 +122,46 @@ const MenuScreen = ({ navigation }: any) => {
           })}
         </ScrollView>
       </View>
-      <Pressable style={styles.overlayRight} onPress={() => navigation.closeDrawer()} />
+      <Pressable style={styles.overlay} onPress={() => navigation.closeDrawer()} />
     </View>
   )
 }
 
 const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
-    flexDirection: 'row',
-    backgroundColor: 'transparent',
-    paddingBottom: 74,
-  },
+  screen: { flex: 1, flexDirection: 'row' },
   drawer: {
-    width: '78%',
-    backgroundColor: '#132238',
-    borderRightWidth: 1,
-    borderRightColor: '#1C2F4A',
-    paddingHorizontal: 14,
-    paddingBottom: 14,
+    width: '100%',
+    backgroundColor: '#0B1624',
+    paddingHorizontal: 12,
   },
-  overlayRight: { flex: 1, backgroundColor: 'rgba(0,0,0,0.35)' },
-  ctaRow: { flexDirection: 'row', gap: 10, marginBottom: 16 },
+  overlay: { width: '20%', backgroundColor: '#0B1624', },
+  ctaRow: { flexDirection: 'row', gap: 8, marginBottom: 16 },
   ctaBtn: {
     flex: 1,
-    height: 40,
-    borderRadius: 10,
-    marginBottom: 0,
-    borderWidth: 1,
+    height: 42,
+    borderRadius: 8,
     shadowColor: '#000',
-    shadowOpacity: 0.45,
-    shadowRadius: 4,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 4,
-    overflow: 'hidden',
+    shadowOpacity: 0.3,
+    shadowRadius: 3,
+    elevation: 3,
   },
-  depositBtn: { borderColor: '#4BB978' },
-  withdrawBtn: { borderColor: '#F09D62' },
+  btnIcon: { width: 14, height: 14 },
   ctaText: { color: '#FFF', fontFamily: AppFonts.montserratBold, fontSize: 13 },
-  menuList: { paddingBottom: 24 },
+  listContainer: { paddingBottom: 60 },
   menuItem: {
-    minHeight: 52,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
-    borderRadius: 8,
-    paddingHorizontal: 10,
-    marginBottom: 4,
+    height: 48,
+    paddingHorizontal: 12,
+    borderRadius: 6,
+    marginBottom: 1,
   },
-  menuItemActive: { backgroundColor: '#2A2E40' },
-  iconBox: { width: 22, alignItems: 'center', justifyContent: 'center' },
-  menuIcon: { width: 18, height: 18, tintColor: '#C3CEDF', resizeMode: 'contain' },
-  menuIconActive: { tintColor: '#FF8E40' },
-  menuLabel: { color: '#EEF3FA', fontFamily: AppFonts.montserratMedium, fontSize: 15 },
-  menuLabelActive: { color: '#FF8E40', fontFamily: AppFonts.montserratSemiBold },
+  menuItemActive: { backgroundColor: '#FF8B2D' },
+  iconBox: { width: 30, alignItems: 'flex-start' },
+  menuIcon: { width: 18, height: 18, tintColor: '#8E9BAC', resizeMode: 'contain' },
+  menuIconActive: { tintColor: '#FFFFFF' },
+  menuLabel: { color: '#D1DAE6', fontFamily: AppFonts.montserratMedium, fontSize: 14.5, marginLeft: 2 },
+  menuLabelActive: { color: '#FFFFFF', fontFamily: AppFonts.montserratSemiBold },
 })
 
 export default MenuScreen
-

@@ -18,9 +18,10 @@ import {
   FlatList,
 } from 'react-native'
 const isFabricRenderer = !!(globalThis as any)?.nativeFabricUIManager
-if (!isFabricRenderer && Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
-  UIManager.setLayoutAnimationEnabledExperimental(true)
-}
+// LayoutAnimation can cause crashes on Android during high-frequency scroll updates
+// if (!isFabricRenderer && Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+//   UIManager.setLayoutAnimationEnabledExperimental(true)
+// }
 import { useAuth } from '../../hooks/useAuth'
 import { useNavigation } from '@react-navigation/native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -253,13 +254,17 @@ const OddsCell = memo(({ side, pair, isLast }: { side: 'back' | 'lay'; pair: Lan
   const sz = pair ? (side === 'back' ? pair.backSize : pair.laySize) : null
   const ok = raw != null && raw !== '—' && landingOddsValid(raw)
   const isBack = side === 'back'
-  const bg = ok ? (isBack ? ODDS_BACK_ON : ODDS_LAY_ON) : isBack ? ODDS_BACK_OFF : ODDS_LAY_OFF
+  const bg = ok ? (isBack ? '#a7d8fd' : '#f9c9d4') : (isBack ? '#d4ecfe' : '#fce4ea')
 
   const showVol = (val: unknown) =>
     val != null && val !== '—' && String(val).trim() !== '' && String(val) !== '0.00'
 
   return (
-    <View style={[styles.oddsStripCell, { width: ODDS_CELL_W, backgroundColor: bg }, isLast && styles.oddsStripCellLast]}>
+    <View style={[styles.oddsStripCell, {
+      width: 62, backgroundColor: bg,
+      height: LANDING_ROW_H, borderLeftWidth: 1, borderLeftColor: 'white',
+      borderBottomColor: 'white', borderBottomWidth: 1
+    }]}>
       {ok ? (
         <>
           <Text style={styles.oddsStripPrice}>{raw}</Text>
@@ -290,16 +295,16 @@ const MatchTeamRow = memo(({ row, eventTime, leftClusterW, onPress }: { row: Spo
 
   return (
     <Pressable
-      style={[styles.matchRow, { minHeight: LANDING_ROW_H }]}
+      style={[styles.matchRow, { height: LANDING_ROW_H }]}
       onPress={onPress}
     >
-      <View style={[styles.matchRowLeft, { width: leftClusterW, flexShrink: 0 }]}>
+      <View style={[styles.matchRowLeft, { width: leftClusterW, height: LANDING_ROW_H, borderBottomWidth: 1, borderBottomColor: '#1c2f4a' }]}>
         <View style={styles.matchMeta}>
-          {row.inPlay ?? (row as any).in_play ? <Text style={styles.liveTag}>LIVE</Text> : null}
           <Text style={styles.matchMetaDay}>
             {getDayGroup(typeof eventTime === 'string' ? eventTime : undefined) || 'Today'}
           </Text>
           <Text style={styles.matchMetaClock}>{formatTimeOnly(eventTime)}</Text>
+          {row.inPlay ?? (row as any).in_play ? <Text style={styles.liveTagStatic}>LIVE</Text> : null}
         </View>
         <View style={styles.matchTeamsBox}>
           <View style={styles.matchInfoTitleRow}>
@@ -314,11 +319,11 @@ const MatchTeamRow = memo(({ row, eventTime, leftClusterW, onPress }: { row: Spo
             )}
           </View>
           <View>
-            <Text style={styles.matchTeamsLine1} numberOfLines={line2 ? 2 : 3}>
+            <Text style={styles.matchTeamsLine1} numberOfLines={1}>
               {safeText(line1, '—')}
             </Text>
             {line2 && (
-              <Text style={styles.matchTeamsLine2} numberOfLines={2}>
+              <Text style={styles.matchTeamsLine2} numberOfLines={1}>
                 {line2}
               </Text>
             )}
@@ -338,7 +343,7 @@ const MatchTeamRow = memo(({ row, eventTime, leftClusterW, onPress }: { row: Spo
 const MatchOddsRow = memo(({ row, stripCols, maxCols, rowKey, onPress }: { row: SportsbookMatch, stripCols: LandingOddsPairColumn[], maxCols: number, rowKey: string, onPress: () => void }) => {
   return (
     <Pressable
-      style={[styles.oddsRow, { minHeight: LANDING_ROW_H }]}
+      style={[styles.oddsRow, { height: LANDING_ROW_H, borderBottomWidth: 1, borderBottomColor: '#1c2f4a' }]}
       onPress={onPress}
     >
       <View style={styles.oddsStripRowHorizontal}>
@@ -390,7 +395,7 @@ const MatchSection = memo(({ sportKey, navigation }: { sportKey: 'cricket' | 'te
     const remove = addMatchDataListener((kind, payload) => {
       if (kind === 'error') return;
       const { sportName, matches } = normalizeMatchDataUpdatePayload(payload);
-      if (sportName !== sportKey || !Array.isArray(matches)) return;
+      if (sportName !== sportKey || !Array.isArray(matches) || matches.length === 0) return;
 
       const defaults = sportKey === 'cricket' ? { tournament: 'Cricket' as const } : sportKey === 'tennis' ? { tournament: 'Tennis' as const } : { tournament: 'Football' as const }
       localRef.current = mapMatchDataRowsToTopMatches(matches, defaults);
@@ -458,7 +463,21 @@ const MatchSection = memo(({ sportKey, navigation }: { sportKey: 'cricket' | 'te
     });
   }, [navigation, sportKey]);
 
-  if (loading && data.length === 0) return null;
+  if (loading && data.length === 0) {
+    return (
+      <View style={styles.matchWrapper}>
+        <View style={styles.matchHeader}>
+          <View style={styles.matchHeaderLeft}>
+            <Icon width={22} height={26} fill="#FFFFFF" />
+            <Text style={styles.matchTitle}>{displayName}</Text>
+          </View>
+        </View>
+        <View style={{ height: 100, justifyContent: 'center', alignItems: 'center' }}>
+          <ActivityIndicator color={colors.accent} size="small" />
+        </View>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.matchWrapper}>
@@ -628,12 +647,8 @@ const TopStrip = memo(({ markVideoFailed, videoFailedSet }: {
               }
             }}
           >
-            {videoFailedSet.has(cat.name) ? (
-              <Image source={cat.image} style={styles.stripCardImage} resizeMode="cover" />
-            ) : (
-              <Video source={cat.video} style={styles.stripCardImage} paused={false} repeat muted resizeMode={ResizeMode.COVER}
-                onError={() => markVideoFailed(cat.name)} />
-            )}
+            {/* Explicitly using Images instead of Videos to fix Scroll-based crashes */}
+            <Image source={cat.image} style={styles.stripCardImage} resizeMode="cover" />
             <View style={styles.stripTitleBar}><Text style={styles.stripCardTitle}>{cat.name}</Text></View>
           </Pressable>
         );
@@ -676,9 +691,12 @@ export const LandingPage = ({ onOpenLogin, onOpenSignup, onOpenHome, navigation:
     load()
 
     // NEW: Global matches loading listener
-    const stopMatchesLoading = addMatchDataListener((kind) => {
+    const stopMatchesLoading = addMatchDataListener((kind, payload) => {
       if (kind === 'update' && mounted) {
-        setMatchesLoading(false);
+        const { matches } = normalizeMatchDataUpdatePayload(payload);
+        if (Array.isArray(matches) && matches.length > 0) {
+          setMatchesLoading(false);
+        }
       }
     });
 
@@ -874,6 +892,7 @@ const styles = StyleSheet.create({
   matchRowLeft: { flexDirection: 'row', alignItems: 'stretch', alignSelf: 'stretch', minWidth: 0 },
   matchMeta: { width: 76, paddingVertical: 8, paddingHorizontal: 6, justifyContent: 'flex-end', alignSelf: 'stretch', borderRightWidth: 0.8, borderRightColor: "white" },
   liveTag: { color: '#FFF', backgroundColor: '#D4322E', fontSize: 9, fontFamily: AppFonts.montserratExtraBold, alignSelf: 'flex-start', paddingHorizontal: 5, paddingVertical: 2, borderRadius: 3, marginBottom: 6, overflow: 'hidden' },
+  liveTagStatic: { color: '#FFF', backgroundColor: '#D4322E', fontSize: 9, fontFamily: AppFonts.montserratExtraBold, alignSelf: 'flex-start', paddingHorizontal: 5, paddingVertical: 2, borderRadius: 3, marginTop: 4, overflow: 'hidden' },
   matchMetaDay: { color: '#9CA3AF', fontSize: 10, fontFamily: AppFonts.montserratRegular, marginBottom: 2 },
   matchMetaClock: { color: '#E5E7EB', fontSize: 12, fontFamily: AppFonts.montserratSemiBold },
   matchTeamsBox: { flex: 1, paddingVertical: 10, paddingHorizontal: 12, justifyContent: 'center' },

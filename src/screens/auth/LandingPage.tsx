@@ -133,6 +133,49 @@ const toAbsoluteImageUrl = (rawUrl: string) => {
   return resolvedUrl
 }
 
+const isChickenRoadStyleGame = (g: LandingGame) => {
+  if (!g) return false
+  const code = String(g.code ?? (g as any).gameCode ?? '').toLowerCase()
+  const name = String(g.name ?? '').toLowerCase()
+  return code.includes('chicken') || name.includes('chicken')
+}
+
+const isCrashGameStyleGame = (g: LandingGame) => {
+  if (!g) return false
+  if (isChickenRoadStyleGame(g)) return false
+  const hay = `${String(g.code ?? (g as any).gameCode ?? '')} ${String(g.name ?? '')}`.toLowerCase()
+  return (
+    hay.includes('aviator') ||
+    hay.includes('crash') ||
+    hay.includes('jetx') ||
+    hay.includes('jet x') ||
+    hay.includes('spaceman') ||
+    hay.includes('lucky jet') ||
+    hay.includes('luckyjet') ||
+    (hay.includes('rocket') && hay.includes('crash'))
+  )
+}
+
+const mergeDedupeGames = (...lists: LandingGame[][]): LandingGame[] => {
+  const seen = new Set<string>()
+  const out: LandingGame[] = []
+  for (const list of lists) {
+    if (!Array.isArray(list)) continue
+    for (const g of list) {
+      if (!g) continue
+      const id = (g as any)._id ?? (g as any).id
+      const key =
+        id != null && String(id).trim() !== ''
+          ? `id:${String(id)}`
+          : `gc:${String(g.providerCode ?? (g as any).provider ?? '').trim().toLowerCase()}:${String((g as any).gameCode ?? g.code ?? '').trim().toLowerCase()}`
+      if (seen.has(key)) continue
+      seen.add(key)
+      out.push(g)
+    }
+  }
+  return out
+}
+
 // --- Removed local time formatters in favor of matchTimeIST ---
 
 const mapMatchDataRowsToTopMatches = (matches: any[], defaults: { tournament: string }): SportsbookMatch[] => {
@@ -679,9 +722,45 @@ export const LandingPage = ({ onOpenLogin, onOpenSignup, onOpenHome, navigation:
     trending: LandingGame[];
     roulette: LandingGame[];
     cardGames: LandingGame[];
-  }>({ liveCasino: [], slots: [], trending: [], roulette: [], cardGames: [] })
+    chickenRoad: LandingGame[];
+    crashGames: LandingGame[];
+  }>({ liveCasino: [], slots: [], trending: [], roulette: [], cardGames: [], chickenRoad: [], crashGames: [] })
   const [casinoLobbyGames, setCasinoLobbyGames] = useState<LandingGame[]>([])
 
+  const [ioChickenRoadGames, setIoChickenRoadGames] = useState<LandingGame[]>([])
+  const [spbCrashGames, setSpbCrashGames] = useState<LandingGame[]>([])
+  const [allCrashTypeGames, setAllCrashTypeGames] = useState<LandingGame[]>([])
+
+  useEffect(() => {
+    let mounted = true
+    const loadFallbacks = async () => {
+      try {
+        const [io, spb, crashCat] = await Promise.all([
+          landingService.getGamesByProvider('IO', 'all', 50),
+          landingService.getGamesByProvider('SPB', 'all', 50),
+          landingService.getGamesByProvider('all', 'Crash Type', 50)
+        ])
+        if (mounted) {
+          setIoChickenRoadGames(io.filter(isChickenRoadStyleGame))
+          setSpbCrashGames(spb.filter(isCrashGameStyleGame))
+          setAllCrashTypeGames(crashCat)
+        }
+      } catch (e) { console.warn('[LandingPage] Fallback fetch failed', e) }
+    }
+    loadFallbacks()
+    return () => { mounted = false }
+  }, [])
+
+  const chickenRoadResolved = useMemo(() => {
+    if (landingGames.chickenRoad.length > 0) return landingGames.chickenRoad
+    if (ioChickenRoadGames.length > 0) return ioChickenRoadGames
+    return casinoLobbyGames.filter(isChickenRoadStyleGame)
+  }, [landingGames.chickenRoad, ioChickenRoadGames, casinoLobbyGames])
+
+  const crashGamesResolved = useMemo(() => {
+    if (landingGames.crashGames.length > 0) return landingGames.crashGames
+    return mergeDedupeGames(spbCrashGames, allCrashTypeGames)
+  }, [landingGames.crashGames, spbCrashGames, allCrashTypeGames])
   useEffect(() => {
     subscribeMatchDataLandingAll()
     let mounted = true
@@ -740,7 +819,7 @@ export const LandingPage = ({ onOpenLogin, onOpenSignup, onOpenHome, navigation:
       }
     } catch (err: any) {
       console.warn('[LandingPage] handleLaunchGame error:', err);
-      
+
       let cleanMsg = err?.message || 'Something went wrong';
       // If it's our verbose apiClient error, try to extract the inner message
       if (cleanMsg.includes(' - {')) {
@@ -766,20 +845,38 @@ export const LandingPage = ({ onOpenLogin, onOpenSignup, onOpenHome, navigation:
   }, [isAuthenticated, onOpenLogin, finalNav]);
 
   const renderSection = useCallback((section: any) => {
+    if (!section.items || section.items.length === 0) return null
     const isTwoRow = section.title === 'Casino Lobby'
     const items = section.items
     const row1 = isTwoRow ? items.slice(0, Math.ceil(items.length / 2)) : items
     const row2 = isTwoRow ? items.slice(Math.ceil(items.length / 2)) : []
+
     return (
       <View key={section.title} style={styles.sectionWrap}>
-        <View style={styles.sectionHeader}><View style={styles.sectionTitleRow}>{section.title !== 'Trending Games' && <LiveIcon width={20} height={20} />}<Text style={styles.sectionTitle}>{section.title}</Text></View></View>
+        <View style={styles.sectionHeader}>
+          <View style={styles.sectionTitleRow}>
+            {section.title !== 'Trending Games' && <LiveIcon width={20} height={20} />}
+            <Text style={styles.sectionTitle}>{section.title}</Text>
+          </View>
+        </View>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.scrollContainer}>
-          <View style={styles.gameRow}>
-            {row1.map((g: any, i: number) => (
-              <TouchableOpacity key={i} style={styles.gameCard} onPress={() => handleLaunchGame(g)} activeOpacity={0.8}>
-                <FastImage source={{ uri: toAbsoluteImageUrl(getLandingGameImage(g)) }} style={styles.gameCardImage} resizeMode={FastImage.resizeMode.cover} />
-              </TouchableOpacity>
-            ))}
+          <View style={{ flexDirection: 'column' }}>
+            <View style={styles.gameRow}>
+              {row1.map((g: any, i: number) => (
+                <TouchableOpacity key={i} style={styles.gameCard} onPress={() => handleLaunchGame(g)} activeOpacity={0.8}>
+                  <FastImage source={{ uri: toAbsoluteImageUrl(getLandingGameImage(g)) }} style={styles.gameCardImage} resizeMode={FastImage.resizeMode.cover} />
+                </TouchableOpacity>
+              ))}
+            </View>
+            {isTwoRow && row2.length > 0 && (
+              <View style={[styles.gameRow, { marginTop: 12 }]}>
+                {row2.map((g: any, i: number) => (
+                  <TouchableOpacity key={i} style={styles.gameCard} onPress={() => handleLaunchGame(g)} activeOpacity={0.8}>
+                    <FastImage source={{ uri: toAbsoluteImageUrl(getLandingGameImage(g)) }} style={styles.gameCardImage} resizeMode={FastImage.resizeMode.cover} />
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
           </View>
         </ScrollView>
       </View>
@@ -791,7 +888,11 @@ export const LandingPage = ({ onOpenLogin, onOpenSignup, onOpenHome, navigation:
       {launchingGame && <View style={styles.globalLoader}><ActivityIndicator size="large" color="#F97316" /></View>}
       <ScrollView showsVerticalScrollIndicator={false} style={styles.scroll}>
         <View style={styles.mainContentArea}>
-          <LandingHeader onLoginPress={onOpenLogin ?? (() => { })} onSignupPress={onOpenSignup ?? (() => { })} />
+          <LandingHeader
+            onLoginPress={onOpenLogin ?? (() => finalNav.navigate('Login'))}
+            onSignupPress={onOpenSignup ?? (() => finalNav.navigate('Login', { initialTab: 'signup' }))}
+            onSearchPress={() => finalNav.navigate('Search')}
+          />
 
           <HeroSlider onTouchStart={e => setTouchStartX(e.nativeEvent.pageX)}
             onTouchEnd={e => {
@@ -813,9 +914,9 @@ export const LandingPage = ({ onOpenLogin, onOpenSignup, onOpenHome, navigation:
 
           <QuickActions
             isAuthenticated={isAuthenticated}
-            onOpenSignup={onOpenSignup ?? (() => { })}
-            onOpenHome={onOpenHome ?? (() => { })}
-            onOpenLogin={onOpenLogin ?? (() => { })}
+            onOpenSignup={onOpenSignup ?? (() => finalNav.navigate('Login', { initialTab: 'signup' }))}
+            onOpenHome={onOpenHome ?? (() => finalNav.navigate('Login'))}
+            onOpenLogin={onOpenLogin ?? (() => finalNav.navigate('Login'))}
             handleLaunchGame={handleLaunchGame}
           />
 
@@ -823,7 +924,13 @@ export const LandingPage = ({ onOpenLogin, onOpenSignup, onOpenHome, navigation:
 
           {gamesLoading ? <ActivityIndicator style={{ marginTop: 20 }} color={colors.accent} /> : [
             { title: 'Trending Games', items: landingGames.trending },
-            { title: 'Casino Lobby', items: landingGames.liveCasino }
+            { title: 'Roulette', items: landingGames.roulette },
+            { title: 'Card Games', items: landingGames.cardGames },
+            { title: 'Casino Lobby', items: casinoLobbyGames },
+            { title: 'Live Casino', items: landingGames.liveCasino },
+            { title: 'Slots', items: landingGames.slots },
+            { title: 'Chicken Road', items: chickenRoadResolved },
+            { title: 'Crash Games', items: crashGamesResolved },
           ].map(s => renderSection(s))}
 
           {matchesLoading ? (
@@ -920,12 +1027,29 @@ const styles = StyleSheet.create({
   oddsRow: { backgroundColor: '#0b1620', borderBottomWidth: 0.7, borderBottomColor: 'white', justifyContent: 'center' },
   matchHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },
   matchHeaderLeft: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  matchTitle: { color: '#FFFFFF', fontSize: 16, fontFamily: AppFonts.montserratBold },
+  matchTitle: {
+    color: '#FFFFFF', fontSize: 16,
+    fontFamily: AppFonts.montserratBold
+  },
   matchViewAllPress: { paddingVertical: 4, paddingHorizontal: 4 },
-  matchViewAll: { color: '#60A5FA', fontSize: 14, fontFamily: AppFonts.montserratSemiBold },
-  matchRow: { flexDirection: 'row', alignItems: 'stretch', backgroundColor: colors.background, borderBottomWidth: 0.7, borderBottomColor: 'white', width: '100%' },
-  matchRowLeft: { flexDirection: 'row', alignItems: 'stretch', alignSelf: 'stretch', minWidth: 0 },
-  matchMeta: { width: 76, paddingVertical: 8, paddingHorizontal: 6, justifyContent: 'flex-end', alignSelf: 'stretch', borderRightWidth: 0.8, borderRightColor: "white" },
+  matchViewAll: {
+    color: '#60A5FA', fontSize: 14,
+    fontFamily: AppFonts.montserratSemiBold
+  },
+  matchRow: {
+    flexDirection: 'row', alignItems: 'stretch',
+    backgroundColor: colors.background, borderBottomWidth: 0.7,
+    borderBottomColor: '#1c2f4a', width: '100%'
+  },
+  matchRowLeft: {
+    flexDirection: 'row', alignItems: 'stretch',
+    alignSelf: 'stretch', minWidth: 0
+  },
+  matchMeta: {
+    width: 76, paddingVertical: 8, paddingHorizontal: 6,
+    justifyContent: 'flex-end',
+    alignSelf: 'stretch', borderRightWidth: 0.8, borderRightColor: '#1c2f4a'
+  },
   liveTag: { color: '#FFF', backgroundColor: '#D4322E', fontSize: 9, fontFamily: AppFonts.montserratExtraBold, alignSelf: 'flex-start', paddingHorizontal: 5, paddingVertical: 2, borderRadius: 3, marginBottom: 6, overflow: 'hidden' },
   liveTagStatic: { color: '#FFF', backgroundColor: '#D4322E', fontSize: 9, fontFamily: AppFonts.montserratExtraBold, alignSelf: 'flex-start', paddingHorizontal: 5, paddingVertical: 2, borderRadius: 3, marginTop: 4, overflow: 'hidden' },
   matchMetaDay: { color: '#9CA3AF', fontSize: 10, fontFamily: AppFonts.montserratRegular, marginBottom: 2 },

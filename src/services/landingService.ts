@@ -19,6 +19,8 @@ type LandingGamesPayload = {
   trending?: LandingGame[]
   roulette?: LandingGame[]
   cardGames?: LandingGame[]
+  chickenRoad?: LandingGame[]
+  crashGames?: LandingGame[]
 }
 
 type LandingGamesResponse = {
@@ -53,11 +55,17 @@ export const landingService = {
       trending: asArray<LandingGame>(data?.trending),
       roulette: asArray<LandingGame>(data?.roulette),
       cardGames: asArray<LandingGame>(data?.cardGames),
+      chickenRoad: asArray<LandingGame>((data as any)?.chickenRoad || (data as any)?.chicken_road),
+      crashGames: asArray<LandingGame>((data as any)?.crashGames || (data as any)?.crash_games),
     }
   },
 
   async getCasinoLobbyGames(limit = 18) {
-    const endpoint = `${API_ENDPOINTS.gamesList}?providerCode=EZ&page=1&limit=${Math.min(limit, 50)}`
+    return this.getGamesByProvider('EZ', 'all', limit)
+  },
+
+  async getGamesByProvider(providerCode: string, category: string = 'all', limit = 50) {
+    const endpoint = `${API_ENDPOINTS.gamesList}?providerCode=${providerCode}&category=${category}&page=1&limit=${limit}`
     const res = await apiClient<GamesListResponse>(endpoint)
     const list = res?.data?.games ?? res?.data?.data?.games ?? res?.games
     return asArray<LandingGame>(list)

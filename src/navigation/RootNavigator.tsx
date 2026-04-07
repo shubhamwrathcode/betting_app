@@ -69,6 +69,7 @@ const TabsNavigator = (props: any) => {
   return (
     <Tab.Navigator
       initialRouteName="Home"
+      backBehavior="initialRoute"
       tabBar={tabBarProps => <BottomTab {...tabBarProps} />}
       screenOptions={{ headerShown: false }}
     >
@@ -83,16 +84,7 @@ const TabsNavigator = (props: any) => {
         })}
       />
       <Tab.Screen name="Casino" component={CasinoScreen} />
-      <Tab.Screen 
-        name="Home" 
-        component={(navProps: any) => (
-          <LandingPage 
-            onOpenLogin={() => navProps.navigation.navigate('Login')}
-            onOpenSignup={() => navProps.navigation.navigate('Login', { initialTab: 'signup' })}
-            onOpenHome={() => navProps.navigation.navigate('Login')}
-          />
-        )}
-      />
+      <Tab.Screen name="Home" component={LandingPage} />
       <Tab.Screen name="InPlay" component={InPlayScreen} />
       <Tab.Screen name="SportsBook" component={SportsbookScreen} />
     </Tab.Navigator>
@@ -110,9 +102,7 @@ const MainAppWithDrawer = (props: any) => (
     }}
     drawerContent={({ navigation }) => <MenuScreen navigation={navigation} />}
   >
-    <Drawer.Screen name="Tabs">
-      {(drawerProps) => <TabsNavigator {...drawerProps} />}
-    </Drawer.Screen>
+    <Drawer.Screen name="Tabs" component={TabsNavigator} />
   </Drawer.Navigator>
 )
 

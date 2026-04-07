@@ -53,7 +53,7 @@ const MenuScreen = ({ navigation }: any) => {
 
   const openAction = (screen: string) => {
     navigation.closeDrawer()
-    navigation.navigate('Tabs', { screen: screen })
+    navigation.navigate(screen)
   }
 
   const menuItems: (MenuItem & { authOnly?: boolean })[] = [

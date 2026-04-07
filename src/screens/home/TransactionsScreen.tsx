@@ -135,23 +135,36 @@ const TransactionsScreen = () => {
       if (type !== 'all') params.type = type
       const qs = `?${new URLSearchParams(params).toString()}`
       const res = await apiClient<any>(`${API_ENDPOINTS.walletTransactions}${qs}`, { method: 'GET' })
-      const raw = res?.data ?? res
-      const nested = raw?.data ?? {}
-      const list =
-        Array.isArray(raw)
-          ? raw
-          : Array.isArray(raw?.transactions)
-            ? raw.transactions
-            : Array.isArray(nested?.transactions)
-              ? nested.transactions
-              : Array.isArray(nested)
-                ? nested
-                : []
-      const pag = res?.pagination ?? raw?.pagination ?? nested?.pagination ?? {}
+
+      // Robust parsing matching BetHistory logic
+      let list: any[] = []
+      let pagData = { page: nextPage, limit: PAGE_SIZE, total: 0, totalPages: 1 }
+
+      if (res) {
+        const data = res.data ?? res
+        if (Array.isArray(data)) {
+          list = data
+        } else if (data && typeof data === 'object') {
+          if (Array.isArray(data.transactions)) list = data.transactions
+          else if (Array.isArray(data.data)) list = data.data
+          else if (Array.isArray(data.records)) list = data.records
+
+          const p = data.pagination || res.pagination
+          if (p) {
+            pagData = {
+              page: Number(p.page ?? nextPage),
+              limit: Number(p.limit ?? PAGE_SIZE),
+              total: Number(p.total ?? p.totalRecords ?? list.length),
+              totalPages: Math.max(1, Number(p.totalPages ?? 1)),
+            }
+          }
+        }
+      }
+
       setTransactions(list)
-      setPage(Number(pag.page ?? nextPage))
-      setTotalPages(Math.max(1, Number(pag.totalPages ?? 1)))
-      setTotal(Number(pag.total ?? pag.totalRecords ?? list.length))
+      setPage(pagData.page)
+      setTotalPages(pagData.totalPages)
+      setTotal(pagData.total)
     } catch (e: any) {
       setTransactions([])
       setPage(1)
@@ -190,19 +203,20 @@ const TransactionsScreen = () => {
       return arr.some(v => v.toLowerCase().includes(q))
     })
     return searched.map((t, idx) => ({
+      ...t, // Include all raw fields to avoid missing data like createdAt
       id: String(t?.id ?? idx),
       transactionTime: formatTime(t?.createdAt),
-      type: t?.type === 'deposit' ? 'Deposit' : t?.type === 'withdrawal' ? 'Withdrawal' : capitalizeFirst(t?.type),
-      amount: moneyOrDash(t?.amount),
-      approvedAmount: String(t?.status).toLowerCase() === 'approved' || String(t?.status).toLowerCase() === 'completed' ? moneyOrDash(t?.amount) : '—',
-      status: statusLabel(t?.status),
+      typeDisplay: t?.type === 'deposit' ? 'Deposit' : t?.type === 'withdrawal' ? 'Withdrawal' : capitalizeFirst(t?.type),
+      amountDisplay: moneyOrDash(t?.amount),
+      approvedAmountDisplay: String(t?.status).toLowerCase() === 'approved' || String(t?.status).toLowerCase() === 'completed' ? moneyOrDash(t?.amount) : '—',
+      statusDisplay: statusLabel(t?.status),
       statusRaw: String(t?.status ?? '').toLowerCase(),
-      balanceBefore: moneyOrDash(t?.balanceBefore),
-      balanceAfter: moneyOrDash(t?.balanceAfter),
-      paymentMethod: formatPaymentMethod(
+      balanceBeforeDisplay: moneyOrDash(t?.balanceBefore),
+      balanceAfterDisplay: moneyOrDash(t?.balanceAfter),
+      paymentMethodDisplay: formatPaymentMethod(
         t?.type === 'deposit' ? (t?.depositToDetail?.type ?? t?.paymentMethod) : t?.type === 'withdrawal' ? (t?.withdrawalToDetail?.type ?? t?.paymentMethod) : t?.paymentMethod,
       ),
-      notes: t?.adminRemarks || t?.remarks || '—',
+      notesDisplay: t?.adminRemarks || t?.remarks || '—',
       proofUrl: t?.type === 'deposit' ? paymentProofUrl(t?.paymentProofUrl) : null,
     }))
   }, [search, statusFilter, transactions])
@@ -266,7 +280,7 @@ const TransactionsScreen = () => {
           <Text style={styles.emptyText}>No deposit or withdrawal transactions yet.</Text>
         ) : (
           <View style={styles.listWrap}>
-            {filtered.map(tx => {
+            {filtered.map((tx: any) => {
               console.log('[Transactions][transactionTime]', { id: tx?.id, transactionTime: tx?.transactionTime, raw: tx })
 
               return (
@@ -274,10 +288,10 @@ const TransactionsScreen = () => {
 
                   <View style={styles.cardHeader}>
                     <Text style={styles.cardTitle}>
-                      {capitalize(tx?.type)}
+                      {capitalize(tx?.typeDisplay)}
                     </Text>
 
-                    {/* <View style={[
+                    <View style={[
                       styles.statusBadge,
                       tx?.statusRaw === 'pending' && styles.badgePending,
                       (tx?.statusRaw === 'approved' || tx?.statusRaw === 'completed') && styles.badgeApproved,
@@ -285,25 +299,12 @@ const TransactionsScreen = () => {
                     ]}>
                       <Text style={[
                         styles.statusBadgeText,
-                        tx?.statusRaw === 'pending' && styles.statusBadgeTextPending
-                      ]}>
-                        {capitalize(tx?.status)}
-                      </Text>
-                    </View> */}
-                    <View style={[
-                      styles.statusBadge,
-                      tx?.status === 'pending' && styles.badgePending,
-                      (tx?.status === 'approved' || tx?.status === 'completed') && styles.badgeApproved,
-                      tx?.status === 'rejected' && styles.badgeRejected
-                    ]}>
-                      <Text style={[
-                        styles.statusBadgeText,
                         
-                        tx?.status === 'pending' && { color: '#ffc108' },
-                        tx?.status === 'rejected' && { color: 'red' },
-                        (tx?.status === 'approved' || tx?.status === 'completed') && { color: 'green' }
+                        tx?.statusRaw === 'pending' && { color: '#ffc108' },
+                        tx?.statusRaw === 'rejected' && { color: 'red' },
+                        (tx?.statusRaw === 'approved' || tx?.statusRaw === 'completed') && { color: 'green' }
                       ]}>
-                        {capitalize(tx?.status)}
+                        {capitalize(tx?.statusDisplay)}
                       </Text>
                     </View>
                   </View>
@@ -327,51 +328,42 @@ const TransactionsScreen = () => {
                   <View style={styles.row}>
                     <Text style={styles.key}>Amount</Text>
                     <Text style={[styles.val, styles.amountValue]}>
-                      {tx?.amount !== null && tx?.amount !== undefined
-                        ? `₹${tx.amount}`
-                        : '-'}
+                      {tx?.amountDisplay}
                     </Text>
                   </View>
 
                   <View style={styles.row}>
                     <Text style={styles.key}>Balance Before</Text>
                     <Text style={[styles.val, styles.amountValue]}>
-                      {tx?.balanceBefore !== null && tx?.balanceBefore !== undefined
-                        ? `₹${tx.balanceBefore}`
-                        : '-'}
+                      {tx?.balanceBeforeDisplay}
                     </Text>
                   </View>
 
                   <View style={styles.row}>
                     <Text style={styles.key}>Balance After</Text>
                     <Text style={[styles.val, styles.amountValue]}>
-                      {tx?.balanceAfter !== null && tx?.balanceAfter !== undefined
-                        ? `₹${tx.balanceAfter}`
-                        : '-'}
+                      {tx?.balanceAfterDisplay}
                     </Text>
                   </View>
 
                   <View style={styles.row}>
                     <Text style={styles.key}>Approved Amount</Text>
                     <Text style={styles.val}>
-                      {tx?.approvedAmount !== null && tx?.approvedAmount !== undefined
-                        ? `₹${tx.approvedAmount}`
-                        : '-'}
+                      {tx?.approvedAmountDisplay}
                     </Text>
                   </View>
 
                   <View style={styles.row}>
                     <Text style={styles.key}>Payment Method</Text>
                     <Text style={styles.val}>
-                      {tx?.depositToDetail?.type ? tx?.depositToDetail?.type.charAt(0).toUpperCase() + tx?.depositToDetail?.type.slice(1)
-                        : '-'}
+                      {tx?.paymentMethodDisplay}
                     </Text>
                   </View>
 
                   <View style={styles.row}>
                     <Text style={styles.key}>Admin / Notes</Text>
                     <Text style={styles.val}>
-                      {tx?.notes ? tx.notes : '-'}
+                      {tx?.notesDisplay}
                     </Text>
                   </View>
 

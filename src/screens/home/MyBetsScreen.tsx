@@ -71,6 +71,7 @@ const mapBetToRow = (b: AnyObj) => {
     id: betId,
     betId: (betId && String(betId).slice(-8)) || '—',
     time: formatDate(b?.createdAt),
+    sport: b?.sportName || b?.sport_name || b?.sport || '—',
     event: b?.eventName || '—',
     market: b?.marketName || b?.marketType || '—',
     selection: b?.selectionName || '—',
@@ -80,6 +81,7 @@ const mapBetToRow = (b: AnyObj) => {
     liability: b?.liability != null ? `₹${Number(b.liability).toLocaleString('en-IN')}` : '—',
     status: b?.status || 'open',
     statusRaw,
+    result: b?.result || b?.matchResult || '—',
     potentialWin: b?.potentialProfit != null ? `₹${Number(b.potentialProfit).toLocaleString('en-IN')}` : '—',
     cardTitle: b?.eventName || betId,
   }
@@ -101,25 +103,48 @@ const MyBetsScreen = () => {
   const goBack = useCallback(() => navigation.navigate(returnToTab), [navigation, returnToTab])
   const goToOpenBets = useCallback(() => navigation.navigate('SportsBook'), [navigation])
 
-  const fetchOpen = useCallback(async (page = 1) => {
+  const fetchOpen = useCallback(async (pageNum = 1) => {
     if (!isAuthenticated) {
       setLoading(false)
       return
     }
     setLoading(true)
     try {
-      const qs = new URLSearchParams({ page: String(page), limit: '20' }).toString()
-      const res = await apiClient<any>(`${API_ENDPOINTS.sportsbookBetOpen}?${qs}`, { method: 'GET' })
-      const list = parseOpenBetsList(res)
-      const pag = res?.pagination ?? res?.data?.pagination ?? (res?.data && typeof res.data === 'object' ? res.data.pagination : null)
+      const params: Record<string, string> = { page: String(pageNum), limit: '20' }
+      const qs = `?${new URLSearchParams(params).toString()}`
+      const res = await apiClient<any>(`${API_ENDPOINTS.sportsbookBetOpen}${qs}`, { method: 'GET' })
+
+      // Robust parsing matching BetHistory logic
+      let list: any[] = []
+      let pagData = { page: pageNum, limit: 20, total: 0, totalPages: 1 }
+
+      if (res) {
+        const data = res.data ?? res
+        if (Array.isArray(data)) {
+          list = data
+          pagData.total = res.pagination?.total ?? data.length
+          pagData.totalPages = res.pagination?.totalPages ?? 1
+        } else if (data && typeof data === 'object') {
+          if (Array.isArray(data.bets)) list = data.bets
+          else if (Array.isArray(data.data)) list = data.data
+          else if (Array.isArray(data.openBets)) list = data.openBets
+          else if (Array.isArray(data.records)) list = data.records
+
+          const p = data.pagination || res.pagination
+          if (p) {
+            pagData = {
+              page: Number(p.page ?? pageNum),
+              limit: Number(p.limit ?? 20),
+              total: Number(p.total ?? p.totalRecords ?? list.length),
+              totalPages: Math.max(1, Number(p.totalPages ?? 1)),
+            }
+          }
+        }
+      }
+
       const rows = list.map(mapBetToRow).filter((row: AnyObj) => row.id)
       setBets(rows)
-      setPagination({
-        page: Number(pag?.page ?? 1),
-        limit: Number(pag?.limit ?? 20),
-        total: Number(pag?.total ?? pag?.totalRecords ?? list.length),
-        totalPages: Number(pag?.totalPages ?? 1),
-      })
+      setPagination(pagData)
     } catch {
       setBets([])
     } finally {
@@ -208,6 +233,7 @@ const MyBetsScreen = () => {
                 </View>
                 <View style={styles.row}><Text style={styles.key}>Time</Text><Text style={styles.val}>{row.time}</Text></View>
                 <View style={styles.row}><Text style={styles.key}>Bet ID</Text><Text style={styles.val}>{row.betId}</Text></View>
+                <View style={styles.row}><Text style={styles.key}>Sport</Text><Text style={styles.val}>{row.sport}</Text></View>
                 <View style={styles.row}><Text style={styles.key}>Event</Text><Text style={styles.val}>{row.event}</Text></View>
                 <View style={styles.row}><Text style={styles.key}>Market</Text><Text style={styles.val}>{row.market}</Text></View>
                 <View style={styles.row}><Text style={styles.key}>Selection</Text><Text style={styles.val}>{row.selection}</Text></View>
@@ -216,7 +242,8 @@ const MyBetsScreen = () => {
                 <View style={styles.row}><Text style={styles.key}>Stake</Text><Text style={styles.amountVal}>{row.stake}</Text></View>
                 <View style={styles.row}><Text style={styles.key}>Liability</Text><Text style={styles.amountVal}>{row.liability}</Text></View>
                 <View style={styles.row}><Text style={styles.key}>Potential Win</Text><Text style={styles.amountVal}>{row.potentialWin}</Text></View>
-                {isBetCancellableStatus(row.statusRaw) ? (
+                <View style={styles.row}><Text style={styles.key}>Result</Text><Text style={styles.val}>{row.result}</Text></View>
+                {/* {isBetCancellableStatus(row.statusRaw) ? (
                   <View style={styles.actionsRow}>
                     <Pressable style={styles.cardCashoutBtn} onPress={goToOpenBets}>
                       <Text style={styles.cardCashoutBtnText}>Cash Out</Text>
@@ -227,7 +254,7 @@ const MyBetsScreen = () => {
                   </View>
                 ) : (
                   <Text style={styles.closedText}>BET CLOSED</Text>
-                )}
+                )} */}
               </View>
             ))}
           </View>

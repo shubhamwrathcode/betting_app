@@ -624,6 +624,7 @@ const TopStrip = memo(({ markVideoFailed, videoFailedSet }: {
   return (
     <View style={styles.topStrip}>
       {trendingCategories.map(cat => {
+        const isFailed = videoFailedSet.has(cat.name);
         return (
           <Pressable
             key={cat.name}
@@ -647,8 +648,30 @@ const TopStrip = memo(({ markVideoFailed, videoFailedSet }: {
               }
             }}
           >
-            {/* Explicitly using Images instead of Videos to fix Scroll-based crashes */}
+            {/* Always render Image as background layer (fallback/poster) */}
             <Image source={cat.image} style={styles.stripCardImage} resizeMode="cover" />
+
+            {(!isFailed && cat.video) && (
+              <Video
+                source={cat.video}
+                style={StyleSheet.absoluteFill}
+                resizeMode={ResizeMode.COVER}
+                repeat={true}
+                muted={true}
+                playInBackground={false}
+                playWhenInactive={false}
+                onError={() => markVideoFailed(cat.name)}
+                hideShutterView={true}
+                useTextureView={true}
+                controls={false}
+                bufferConfig={{
+                  minBufferMs: 2000,
+                  maxBufferMs: 5000,
+                  bufferForPlaybackMs: 1000,
+                  bufferForPlaybackAfterRebufferMs: 1500
+                }}
+              />
+            )}
             <View style={styles.stripTitleBar}><Text style={styles.stripCardTitle}>{cat.name}</Text></View>
           </Pressable>
         );
@@ -726,8 +749,36 @@ export const LandingPage = ({ onOpenLogin, onOpenSignup, onOpenHome, navigation:
     try {
       const res = await gameService.launchGame(targetCode, game.providerCode || 'all')
       const d = res.data ?? res; const url = d?.launchURL || d?.url;
-      if (url) finalNav.navigate('Game', { url, title: game.name || 'Game' })
-    } finally { setLaunchingGame(false); }
+      if (url) {
+        finalNav.navigate('Game', { url, title: game.name || 'Game' })
+      } else {
+        Toast.show({ type: 'error', text1: 'Launch Failed', text2: 'No valid URL found for this game.' });
+      }
+    } catch (err: any) {
+      console.warn('[LandingPage] handleLaunchGame error:', err);
+      
+      let cleanMsg = err?.message || 'Something went wrong';
+      // If it's our verbose apiClient error, try to extract the inner message
+      if (cleanMsg.includes(' - {')) {
+        try {
+          const jsonBody = cleanMsg.split(' - ').pop();
+          if (jsonBody) {
+            const parsed = JSON.parse(jsonBody);
+            cleanMsg = parsed.message || parsed.msg || cleanMsg;
+          }
+        } catch { /* fallback to original msg */ }
+      }
+      // Strip common API prefixes
+      cleanMsg = cleanMsg.replace(/^API request failed: [0-9]{3} [A-Za-z ]+ - /, '');
+
+      Toast.show({
+        type: 'error',
+        text1: 'Game Unavailable',
+        text2: cleanMsg
+      });
+    } finally {
+      setLaunchingGame(false);
+    }
   }, [isAuthenticated, onOpenLogin, finalNav]);
 
   const renderSection = useCallback((section: any) => {

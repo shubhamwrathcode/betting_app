@@ -19,6 +19,18 @@ import { BottomTab } from '../components/common/BottomTab'
 import { View, ActivityIndicator } from 'react-native'
 import { useAuth } from '../hooks/useAuth'
 
+import GameRulesScreen from '../screens/home/GameRulesScreen'
+import ReferralRewardsScreen from '../screens/home/ReferralRewardsScreen'
+import TransactionsScreen from '../screens/home/TransactionsScreen'
+import MyBetsScreen from '../screens/home/MyBetsScreen'
+import BetHistoryScreen from '../screens/home/BetHistoryScreen'
+import GameHistoryScreen from '../screens/home/GameHistoryScreen'
+import MyWalletScreen from '../screens/home/MyWalletScreen'
+import AccountStatementScreen from '../screens/home/AccountStatementScreen'
+import SupportScreen from '../screens/home/SupportScreen'
+import DepositScreen from '../screens/home/DepositScreen'
+import WithdrawalScreen from '../screens/home/WithdrawalScreen'
+
 type RootStackParamList = {
   MainTabs: { screen?: string }
   Login: { initialTab?: 'login' | 'signup' }
@@ -35,6 +47,17 @@ type RootStackParamList = {
     eventName?: string
     seriesName?: string
   }
+  GameRules: undefined
+  ReferralRewards: undefined
+  Transactions: undefined
+  MyBets: undefined
+  BetHistory: undefined
+  GameHistory: undefined
+  MyWallet: undefined
+  AccountStatement: undefined
+  Support: undefined
+  Deposit: undefined
+  Withdrawal: undefined
 }
 
 const Tab = createBottomTabNavigator()
@@ -121,6 +144,17 @@ export const RootNavigator = () => {
       <Stack.Screen name="MyProfile" component={MyProfileScreen} />
       <Stack.Screen name="AddAccount" component={AddAccountScreen} />
       <Stack.Screen name="MatchDetail" component={MatchDetailScreen} />
+      <Stack.Screen name="GameRules" component={GameRulesScreen} />
+      <Stack.Screen name="ReferralRewards" component={ReferralRewardsScreen} />
+      <Stack.Screen name="Transactions" component={TransactionsScreen} />
+      <Stack.Screen name="MyBets" component={MyBetsScreen} />
+      <Stack.Screen name="BetHistory" component={BetHistoryScreen} />
+      <Stack.Screen name="GameHistory" component={GameHistoryScreen} />
+      <Stack.Screen name="MyWallet" component={MyWalletScreen} />
+      <Stack.Screen name="AccountStatement" component={AccountStatementScreen} />
+      <Stack.Screen name="Support" component={SupportScreen} />
+      <Stack.Screen name="Deposit" component={DepositScreen} />
+      <Stack.Screen name="Withdrawal" component={WithdrawalScreen} />
     </Stack.Navigator>
   )
 }

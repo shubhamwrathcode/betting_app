@@ -13,14 +13,14 @@ const GameScreen = () => {
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <StatusBar barStyle="light-content" backgroundColor="transparent" translucent={true} />
-      <View style={styles.header}>
+      <View style={[styles.header, { backgroundColor: '#0f172a', zIndex: 999 }]}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
           <Text style={styles.backBtnText}>✕</Text>
         </TouchableOpacity>
         <Text style={styles.title} numberOfLines={1}>{title || 'Game'}</Text>
         <View style={{ width: 44 }} />
       </View>
-      
+
       <WebView
         source={{ uri: url }}
         style={styles.webview}
@@ -33,9 +33,13 @@ const GameScreen = () => {
         allowsFullscreenVideo={true}
         domStorageEnabled={true}
         javaScriptEnabled={true}
+        originWhitelist={['*']}
+        mediaPlaybackRequiresUserAction={false}
+        allowsInlineMediaPlayback={true}
       />
     </View>
   )
+
 }
 
 const styles = StyleSheet.create({

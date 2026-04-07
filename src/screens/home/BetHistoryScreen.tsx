@@ -43,21 +43,35 @@ const mapBetToRow = (b: AnyObj, index: number) => {
   const pl = b?.profitLoss != null ? Number(b.profitLoss) : null
   const plStr = pl != null ? (pl >= 0 ? `₹${pl.toLocaleString('en-IN')}` : `−₹${Math.abs(pl).toLocaleString('en-IN')}`) : '—'
   const id = b?._id ?? b?.id ?? `row-${index}`
+
+  // Cashout summary matching web logic
+  let cashoutSummary = '—'
+  if (b?.cashoutAmount != null && b?.cashoutAmount !== '') {
+    cashoutSummary = `₹${Number(b.cashoutAmount).toLocaleString('en-IN')}`
+    if (b?.cashoutOdds != null && b?.cashoutOdds !== '') {
+      cashoutSummary += ` @ ${Number(b.cashoutOdds).toFixed(2)}`
+    }
+  }
+
   return {
     id,
-    betId: typeof id === 'string' && id.length >= 8 ? id.slice(-8) : '—',
+    betId: typeof id === 'string' && id.length >= 8 ? id.slice(-8) : String(id),
     time: formatDate(b?.createdAt),
     createdAt: b?.createdAt,
+    sport: b?.sport || '—',
     event: b?.eventName || '—',
-    market: b?.marketType || '—',
+    market: b?.marketName || b?.marketType || '—',
     selection: b?.selectionName || '—',
-    odds: b?.odds != null ? Number(b.odds) : '—',
+    type: b?.betType || '—',
+    odds: b?.odds != null ? Number(b.odds).toFixed(2) : '—',
     stake: b?.stake != null ? `₹${Number(b.stake).toLocaleString('en-IN')}` : '—',
     status: b?.status || '—',
     statusRaw: status,
     result: b?.result || '—',
     resultRaw: result,
     profitLoss: plStr,
+    cashout: cashoutSummary,
+    settledAt: formatDate(b?.settledAt || b?.cashedOutAt),
     cardTitle: b?.eventName || String(id),
   }
 }
@@ -136,7 +150,7 @@ const BetHistoryScreen = () => {
   const goBack = useCallback(() => navigation.navigate(returnToTab), [navigation, returnToTab])
 
   const fetchHistory = useCallback(
-    async (page = 1) => {
+    async (pageNum = 1) => {
       if (!isAuthenticated) {
         setLoading(false)
         setBets([])
@@ -144,15 +158,51 @@ const BetHistoryScreen = () => {
       }
       setLoading(true)
       try {
-        const params: Record<string, string> = { page: String(page), limit: '20' }
+        const params: Record<string, string> = { page: String(pageNum), limit: '20' }
         if (sport) params.sport = sport
         if (result) params.result = result
         const qs = `?${new URLSearchParams(params).toString()}`
         const res = await apiClient<any>(`${API_ENDPOINTS.sportsbookBetHistory}${qs}`, { method: 'GET' })
-        const data = res?.data ?? res
-        const list = Array.isArray(data?.bets) ? data.bets : []
+
+        // Enhanced parsing to handle various API response formats
+        let list: any[] = []
+        let pagData = { page: pageNum, limit: 20, total: 0, totalPages: 1 }
+
+        if (res) {
+          if (res.success !== false) {
+            const data = res.data ?? res
+            if (Array.isArray(data)) {
+              list = data
+              pagData.total = res.pagination?.total ?? res.pagination?.totalRecords ?? data.length
+              pagData.totalPages = res.pagination?.totalPages ?? 1
+            } else if (data && typeof data === 'object') {
+              if (Array.isArray(data.bets)) list = data.bets
+              else if (Array.isArray(data.data)) list = data.data
+
+              const p = data.pagination || res.pagination
+              if (p) {
+                pagData = {
+                  page: p.page ?? pageNum,
+                  limit: p.limit ?? 20,
+                  total: p.total ?? p.totalRecords ?? list.length,
+                  totalPages: Math.max(1, p.totalPages ?? 1),
+                }
+              }
+            }
+          }
+
+          // Fallback if bets is directly on root
+          if (list.length === 0 && Array.isArray(res.bets)) {
+            list = res.bets
+            if (res.pagination) {
+              pagData.total = res.pagination.total ?? res.pagination.totalRecords ?? list.length
+              pagData.totalPages = res.pagination.totalPages ?? 1
+            }
+          }
+        }
+
         setBets(list.map(mapBetToRow))
-        setPagination(data?.pagination ?? { page: 1, limit: 20, total: list.length, totalPages: 1 })
+        setPagination(pagData)
       } catch (e: any) {
         setBets([])
         Toast.show({ type: 'error', text1: e?.message || 'Failed to load bet history.' })
@@ -220,14 +270,18 @@ const BetHistoryScreen = () => {
                 <View style={styles.separator} />
                 <View style={styles.row}><Text style={styles.key}>Time</Text><Text style={styles.val}>{row.time}</Text></View>
                 <View style={styles.row}><Text style={styles.key}>Bet ID</Text><Text style={styles.val}>{row.betId}</Text></View>
+                <View style={styles.row}><Text style={styles.key}>Sport</Text><Text style={styles.val}>{row.sport}</Text></View>
                 <View style={styles.row}><Text style={styles.key}>Event</Text><Text style={styles.val}>{row.event}</Text></View>
                 <View style={styles.row}><Text style={styles.key}>Market</Text><Text style={styles.val}>{row.market}</Text></View>
                 <View style={styles.row}><Text style={styles.key}>Selection</Text><Text style={styles.val}>{row.selection}</Text></View>
+                <View style={styles.row}><Text style={styles.key}>Type</Text><Text style={styles.val}>{row.type}</Text></View>
                 <View style={styles.row}><Text style={styles.key}>Odds</Text><Text style={styles.val}>{String(row.odds)}</Text></View>
                 <View style={styles.row}><Text style={styles.key}>Stake</Text><Text style={styles.amountVal}>{row.stake}</Text></View>
                 <View style={styles.row}><Text style={styles.key}>Status</Text><Text style={styles.val}>{row.status}</Text></View>
                 <View style={styles.row}><Text style={styles.key}>Result</Text><Text style={styles.val}>{row.result}</Text></View>
                 <View style={styles.row}><Text style={styles.key}>P&L</Text><Text style={styles.amountVal}>{row.profitLoss}</Text></View>
+                <View style={styles.row}><Text style={styles.key}>Cashout</Text><Text style={styles.val}>{row.cashout}</Text></View>
+                <View style={styles.row}><Text style={styles.key}>Settled</Text><Text style={styles.val}>{row.settledAt}</Text></View>
               </View>
             ))}
           </View>

@@ -298,11 +298,11 @@ export function getLandingCardOddsTriples(
   return legacy.map(p =>
     p
       ? {
-          back: p.back,
-          lay: p.lay,
-          backSize: p.backSize,
-          laySize: p.laySize,
-        }
+        back: p.back,
+        lay: p.lay,
+        backSize: p.backSize,
+        laySize: p.laySize,
+      }
       : null,
   )
 }

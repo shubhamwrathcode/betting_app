@@ -45,7 +45,6 @@ type SearchMatch = {
 const SEARCH_MIN_CHARS = 3
 const SEARCH_LIMIT = 15
 const DEBOUNCE_MS = 350
-const GRID_COLUMNS = 2
 
 const toAbsoluteImageUrl = (rawUrl: string) => {
   const src = rawUrl.trim()
@@ -152,7 +151,6 @@ const SearchScreen = () => {
   }, [query])
 
   const hasSearchText = useMemo(() => query.trim().length >= SEARCH_MIN_CHARS, [query])
-  const gameCardWidth = '48%'
 
   const applyGameFilterFromSearch = (game: SearchGame) => {
     navigation.navigate('MainTabs', {
@@ -170,19 +168,14 @@ const SearchScreen = () => {
 
   return (
     <View style={[styles.page, { paddingTop: insets.top }]}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Search</Text>
-        <Pressable onPress={() => navigation.goBack()}>
-          <Text style={styles.closeText}>Close</Text>
-        </Pressable>
-      </View>
+      <View style={styles.fixedHeaderArea}>
+        <View style={styles.header}>
+          <Text style={styles.title}>Search</Text>
+          <Pressable onPress={() => navigation.goBack()} hitSlop={10}>
+            <Text style={styles.closeText}>Close</Text>
+          </Pressable>
+        </View>
 
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
-        style={styles.scroll}
-        contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 120, flexGrow: 1 }]}
-      >
         <View style={styles.searchBox}>
           <Image source={ImageAssets.search} style={styles.searchIcon} />
           <TextInput
@@ -191,47 +184,73 @@ const SearchScreen = () => {
             placeholder="Search games and matches"
             placeholderTextColor="#8FA1BC"
             style={styles.searchInput}
-            autoFocus
           />
         </View>
+      </View>
 
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        style={styles.scroll}
+        contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 120 }]}
+      >
         {!hasSearchText ? (
-          <Text style={styles.helpText}>Enter at least {SEARCH_MIN_CHARS} characters to search</Text>
+          <View style={styles.resultsHeader}>
+            <View style={styles.trendingHeader}>
+              <Text style={styles.blockTitle}>Trending games</Text>
+              <Pressable
+                onPress={() =>
+                  navigation.navigate('MainTabs', {
+                    screen: 'Casino',
+                    params: {
+                      searchSelection: {
+                        providerCode: 'all',
+                        categoryCode: 'lobby',
+                        gameName: '',
+                        key: Date.now(),
+                      },
+                    },
+                  })
+                }
+              >
+                <Text style={styles.viewAllText}>View all</Text>
+              </Pressable>
+            </View>
+            <FlatList
+              data={trendingGames}
+              keyExtractor={(game, idx) => `${game.code || game.gameCode || idx}`}
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.horizontalScrollList}
+              renderItem={({ item: game }) => {
+                const img = gameImage(game)
+                return (
+                  <Pressable
+                    style={styles.horizontalGameCard}
+                    onPress={() => applyGameFilterFromSearch(game)}
+                  >
+                    <View style={styles.horizontalImageContainer}>
+                      <Image
+                        source={img ? { uri: toAbsoluteImageUrl(img) } : ImageAssets.gameItemsliderPng}
+                        style={styles.gameImage}
+                      />
+                    </View>
+                    <Text style={styles.resultName} numberOfLines={1}>
+                      {getGameName(game)}
+                    </Text>
+                  </Pressable>
+                )
+              }}
+            />
+          </View>
         ) : searchLoading ? (
-          <Text style={styles.helpText}>Searching...</Text>
+          <View style={styles.statusBox}>
+            <ActivityIndicator size="small" color="#F0A769" />
+            <Text style={styles.helpText}>Searching...</Text>
+          </View>
         ) : (
-          <>
-            {results.games.length > 0 ? (
-              <View style={styles.block}>
-                <Text style={styles.blockTitle}>Games</Text>
-                <FlatList
-                  data={results.games}
-                  keyExtractor={(game, idx) => `${game.code || game.gameCode || idx}`}
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={styles.horizontalScrollList}
-                  renderItem={({ item: game }) => {
-                    const img = gameImage(game)
-                    return (
-                      <Pressable
-                        style={styles.horizontalGameCard}
-                        onPress={() => applyGameFilterFromSearch(game)}
-                      >
-                        <Image
-                          source={img ? { uri: toAbsoluteImageUrl(img) } : ImageAssets.gameItemsliderPng}
-                          style={styles.horizontalGameImage}
-                        />
-                        <Text style={styles.resultName} numberOfLines={1}>
-                          {getGameName(game)}
-                        </Text>
-                      </Pressable>
-                    )
-                  }}
-                />
-              </View>
-            ) : null}
-
-            {results.matches.length > 0 ? (
+          <View style={styles.resultsHeader}>
+            {results.matches.length > 0 && (
               <View style={styles.block}>
                 <Text style={styles.blockTitle}>Matches</Text>
                 {results.matches.map((match, idx) => (
@@ -246,61 +265,45 @@ const SearchScreen = () => {
                   </Pressable>
                 ))}
               </View>
-            ) : null}
+            )}
 
-            {results.games.length === 0 && results.matches.length === 0 ? (
+            {results.games.length > 0 && (
+              <View style={styles.block}>
+                <Text style={[styles.blockTitle, { marginBottom: 12 }]}>Games</Text>
+                <FlatList
+                  data={results.games}
+                  keyExtractor={(game, idx) => `${game.code || game.gameCode || idx}`}
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.horizontalScrollList}
+                  renderItem={({ item: game }) => {
+                    const img = gameImage(game)
+                    return (
+                      <Pressable
+                        style={styles.horizontalGameCard}
+                        onPress={() => applyGameFilterFromSearch(game)}
+                      >
+                        <View style={styles.horizontalImageContainer}>
+                          <Image
+                            source={img ? { uri: toAbsoluteImageUrl(img) } : ImageAssets.gameItemsliderPng}
+                            style={styles.gameImage}
+                          />
+                        </View>
+                        <Text style={styles.resultName} numberOfLines={1}>
+                          {getGameName(game)}
+                        </Text>
+                      </Pressable>
+                    )
+                  }}
+                />
+              </View>
+            )}
+
+            {results.games.length === 0 && results.matches.length === 0 && (
               <Text style={styles.helpText}>No games or matches found</Text>
-            ) : null}
-          </>
-        )}
-
-        <View style={styles.block}>
-          <View style={styles.blockHeader}>
-            <Text style={styles.blockTitle}>Trending games</Text>
-            <Pressable
-              onPress={() =>
-                navigation.navigate('MainTabs', {
-                  screen: 'Casino',
-                  params: {
-                    searchSelection: {
-                      providerCode: 'all',
-                      categoryCode: 'lobby',
-                      gameName: '',
-                      key: Date.now(),
-                    },
-                  },
-                })
-              }
-            >
-              <Text style={styles.viewAllText}>View all</Text>
-            </Pressable>
+            )}
           </View>
-          {trendingLoading ? (
-            <Text style={styles.helpText}>Loading trending...</Text>
-          ) : (
-            <FlatList
-              data={trendingGames}
-              keyExtractor={(game, idx) => `${game.code || game.gameCode || idx}`}
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.horizontalScrollList}
-              renderItem={({ item: game }) => {
-                const img = gameImage(game)
-                return (
-                  <Pressable
-                    style={styles.horizontalTrendCard}
-                    onPress={() => applyGameFilterFromSearch(game)}
-                  >
-                    <Image
-                      source={img ? { uri: toAbsoluteImageUrl(img) } : ImageAssets.gameItemsliderPng}
-                      style={styles.horizontalTrendImage}
-                    />
-                  </Pressable>
-                )
-              }}
-            />
-          )}
-        </View>
+        )}
       </ScrollView>
     </View>
   )
@@ -310,14 +313,14 @@ const styles = StyleSheet.create({
   page: { flex: 1, backgroundColor: '#071229' },
   scroll: { flex: 1 },
   content: { paddingHorizontal: 12, paddingBottom: 20 },
+  fixedHeaderArea: { paddingHorizontal: 12, paddingBottom: 10 },
   header: {
-    paddingHorizontal: 12,
     height: 52,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
   },
-  title: { color: '#FFF', fontFamily: AppFonts.montserratBold, fontSize: 20  },
+  title: { color: '#FFF', fontFamily: AppFonts.montserratBold, fontSize: 20 },
   closeText: { color: '#9CB1D0', fontFamily: AppFonts.montserratSemiBold, fontSize: 12 },
   searchBox: {
     marginTop: 8,
@@ -338,30 +341,32 @@ const styles = StyleSheet.create({
     fontFamily: AppFonts.montserratRegular,
     fontSize: 13,
   },
+  resultsHeader: { paddingHorizontal: 12, paddingBottom: 10 },
+  trendingHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 14, marginBottom: 12 },
+  statusBox: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 20, paddingHorizontal: 12 },
   helpText: {
     marginTop: 12,
     color: '#8FA1BC',
     fontFamily: AppFonts.montserratRegular,
     fontSize: 12,
+    paddingHorizontal: 12,
   },
   block: { marginTop: 16 },
-  blockHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   blockTitle: { color: '#FFF', fontFamily: AppFonts.montserratBold, fontSize: 14 },
   viewAllText: { color: '#F0A769', fontFamily: AppFonts.montserratSemiBold, fontSize: 12 },
   horizontalScrollList: { paddingRight: 20, gap: 12, paddingTop: 10 },
   horizontalGameCard: { width: 146, gap: 8 },
-  horizontalGameImage: { width: '100%', height: 104, borderRadius: 10, backgroundColor: '#18243A' },
-  resultName: { color: '#E6EEFC', fontFamily: AppFonts.montserratMedium, fontSize: 12, marginTop: 4 },
+  horizontalImageContainer: { width: '100%', height: 104, borderRadius: 12, overflow: 'hidden', backgroundColor: '#18243A' },
+  gameImage: { width: '100%', height: '100%' },
+  resultName: { color: '#E6EEFC', fontFamily: AppFonts.montserratMedium, fontSize: 12, marginTop: 4, paddingHorizontal: 2 },
   matchItem: {
     marginTop: 8,
-    paddingVertical: 10,
-    paddingHorizontal: 10,
+    paddingVertical: 12,
+    paddingHorizontal: 12,
     borderRadius: 8,
     backgroundColor: '#15233A',
   },
   matchName: { color: '#E6EEFC', fontFamily: AppFonts.montserratMedium, fontSize: 12 },
-  horizontalTrendCard: { width: 146, height: 104, borderRadius: 12, overflow: 'hidden', backgroundColor: '#1F2C47' },
-  horizontalTrendImage: { width: '100%', height: '100%' },
 })
 
 export default SearchScreen

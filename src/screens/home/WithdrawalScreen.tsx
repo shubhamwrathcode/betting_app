@@ -42,6 +42,7 @@ const WithdrawalScreen = () => {
   const insets = useSafeAreaInsets()
   const { isAuthenticated, user } = useAuth()
   const returnToTab = route.params?.returnToTab ?? 'Home'
+  const isDemoUser = (user as any)?.role === 'demo' || (user as any)?.isDemo === true
 
   const [accounts, setAccounts] = useState<AnyObj[]>([])
   const [loading, setLoading] = useState(true)
@@ -54,7 +55,18 @@ const WithdrawalScreen = () => {
   const [transactionLimits, setTransactionLimits] = useState<AnyObj | null>(null)
   const [balanceInfo, setBalanceInfo] = useState<AnyObj | null>(null)
 
-  const goBack = useCallback(() => navigation.navigate(returnToTab), [navigation, returnToTab])
+  const goBack = useCallback(() => {
+    const tabRoutes = ['Home', 'Casino', 'InPlay', 'SportsBook', 'Menu']
+    if (tabRoutes.includes(returnToTab)) {
+      navigation.navigate('MainTabs', { screen: returnToTab })
+    } else {
+      try {
+        navigation.navigate(returnToTab)
+      } catch (e) {
+        navigation.navigate('MainTabs', { screen: 'Home' })
+      }
+    }
+  }, [navigation, returnToTab])
 
   const fetchAccounts = useCallback(async () => {
     if (!isAuthenticated) {
@@ -174,9 +186,9 @@ const WithdrawalScreen = () => {
         otp: otpTrimmed,
         note: noteTrimmed,
       }
-     
+
       const res = await apiClient<any>(API_ENDPOINTS.walletWithdrawal, { method: 'POST', body: payload })
-     
+
       if (res?.success) {
         Toast.show({ type: 'success', text1: res?.message || 'Withdrawal request submitted successfully.' })
         setAmount('')
@@ -184,11 +196,11 @@ const WithdrawalScreen = () => {
         setOtp('')
         setOtpSent(false)
       } else {
-       
+
         Toast.show({ type: 'error', text1: res?.message || 'Withdrawal request failed.' })
       }
     } catch (e: any) {
-     
+
       Toast.show({ type: 'error', text1: extractApiErrorMessage(e, 'Withdrawal request failed.') })
     } finally {
       setSubmitLoading(false)
@@ -204,65 +216,83 @@ const WithdrawalScreen = () => {
         onSearchPress={() => navigation.navigate('Search')}
       />
       <ScrollView contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 100 }]} showsVerticalScrollIndicator={false}>
-        <View style={styles.topCard}>
-          <Text style={styles.topTitle}>Withdrawal</Text>
-          <Text style={styles.topDesc}>Following payment withdrawal information:: Cashable Amount : {cashable.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
-        </View>
+        {isDemoUser ? (
+          <View style={styles.demoOnlyContainer}>
+            <View style={styles.demoBanner}>
+              <Text style={styles.demoBannerText}>Demo user can only explore the platform.</Text>
+            </View>
+            <View style={styles.topCard}>
+              <Text style={styles.topTitle}>Withdrawal Disabled</Text>
+              <Text style={styles.topDesc}>Financial transactions are not available for demo accounts. Please create a real account to start playing.</Text>
+            </View>
 
-        <View style={styles.modeRow}>
-          <Pressable style={styles.modeBtn}><Text style={styles.modeBtnText}>Bank</Text></Pressable>
-        </View>
-
-        {loading ? (
-          <Text style={styles.emptyText}>Loading bank accounts...</Text>
-        ) : accounts.length === 0 ? (
-          <View style={styles.block}>
-            <Text style={styles.emptyText}>No bank account added yet. Add one to request withdrawal.</Text>
-            <Pressable style={styles.addBankLink} onPress={() => navigation.navigate('AddAccount')}>
-              <Text style={styles.addBankLinkText}>Add bank account</Text>
+            <Pressable style={styles.backBtn} onPress={goBack}>
+              <Text style={styles.backBtnText}>Go Back</Text>
             </Pressable>
           </View>
         ) : (
-          <View style={styles.block}>
-            <Text style={styles.blockHeading}>Your bank account</Text>
-            <Text style={styles.smallNote}>Withdrawal will be sent to the selected account below.</Text>
-            <View style={styles.cardsRow}>
-              {accounts.map(acc => (
-                <Pressable key={String(acc?._id)} style={[styles.accountCard, acc?.isDefaultForWithdrawal && styles.accountCardSelected]} onPress={() => void selectAccount(String(acc?._id))}>
-                  <Text style={styles.bankName}>{acc?.bankName}</Text>
-                  <Text style={styles.holder}>{String(acc?.accountHolderName || '').toUpperCase()}</Text>
-                  <Text style={styles.number}>{maskAccountNumber(acc?.accountNumber)}</Text>
-                  <Text style={styles.ifsc}>IFSC: {acc?.ifscCode}</Text>
-                  {acc?.isDefaultForWithdrawal ? <Text style={styles.defaultBadge}>Use for withdrawal</Text> : null}
+          <>
+            <View style={styles.topCard}>
+              <Text style={styles.topTitle}>Withdrawal</Text>
+              <Text style={styles.topDesc}>Following payment withdrawal information:: Cashable Amount : {cashable.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
+            </View>
+
+            <View style={styles.modeRow}>
+              <Pressable style={styles.modeBtn}><Text style={styles.modeBtnText}>Bank</Text></Pressable>
+            </View>
+
+            {loading ? (
+              <Text style={styles.emptyText}>Loading bank accounts...</Text>
+            ) : accounts.length === 0 ? (
+              <View style={styles.block}>
+                <Text style={styles.emptyText}>No bank account added yet. Add one to request withdrawal.</Text>
+                <Pressable style={styles.addBankLink} onPress={() => navigation.navigate('AddAccount')}>
+                  <Text style={styles.addBankLinkText}>Add bank account</Text>
                 </Pressable>
-              ))}
-            </View>
-          </View>
+              </View>
+            ) : (
+              <View style={styles.block}>
+                <Text style={styles.blockHeading}>Your bank account</Text>
+                <Text style={styles.smallNote}>Withdrawal will be sent to the selected account below.</Text>
+                <View style={styles.cardsRow}>
+                  {accounts.map(acc => (
+                    <Pressable key={String(acc?._id)} style={[styles.accountCard, acc?.isDefaultForWithdrawal && styles.accountCardSelected]} onPress={() => void selectAccount(String(acc?._id))}>
+                      <Text style={styles.bankName}>{acc?.bankName}</Text>
+                      <Text style={styles.holder}>{String(acc?.accountHolderName || '').toUpperCase()}</Text>
+                      <Text style={styles.number}>{maskAccountNumber(acc?.accountNumber)}</Text>
+                      <Text style={styles.ifsc}>IFSC: {acc?.ifscCode}</Text>
+                      {acc?.isDefaultForWithdrawal ? <Text style={styles.defaultBadge}>Use for withdrawal</Text> : null}
+                    </Pressable>
+                  ))}
+                </View>
+              </View>
+            )}
+
+            {!loading && accounts.length > 0 ? (
+              <View style={styles.block}>
+                <Text style={styles.blockHeading}>Enter Details</Text>
+                <Text style={styles.smallNote}>Min withdrawal: ₹{minWithdrawal.toLocaleString('en-IN')}. Max: ₹{maxWithdrawal.toLocaleString('en-IN')}.</Text>
+                <Text style={styles.label}>Amount to withdraw</Text>
+                <TextInput style={styles.input} keyboardType="number-pad" placeholder="Amount to withdraw" placeholderTextColor="#7f8ca0" value={amount} onChangeText={txt => setAmount(txt.replace(/[^\d.]/g, ''))} />
+
+                <Text style={styles.label}>Note (optional, max 200 characters)</Text>
+                <TextInput style={styles.input} placeholder="Note (optional)" placeholderTextColor="#7f8ca0" value={note} onChangeText={txt => setNote(txt.slice(0, 200))} />
+
+                <Text style={styles.label}>OTP (sent to your registered mobile)</Text>
+                <View style={styles.otpRow}>
+                  <TextInput style={[styles.input, { flex: 1 }]} keyboardType="number-pad" placeholder="Enter 6-digit OTP" placeholderTextColor="#7f8ca0" value={otp} onChangeText={txt => setOtp(txt.replace(/\D/g, '').slice(0, 6))} />
+                  <Pressable style={styles.otpBtn} onPress={() => void handleSendOtp()} disabled={otpLoading}>
+                    <Text style={styles.otpBtnText}>{otpLoading ? 'Sending...' : 'Send OTP'}</Text>
+                  </Pressable>
+                </View>
+
+                <Pressable style={[styles.submitBtn, (submitLoading || !otpSent) && styles.disabledBtn]} onPress={() => void handleWithdrawalSubmit()} disabled={submitLoading || !otpSent}>
+                  <Text style={styles.submitBtnText}>{submitLoading ? 'Submitting...' : 'Request Withdrawal'}</Text>
+                </Pressable>
+              </View>
+            ) : null}
+          </>
         )}
-
-        {!loading && accounts.length > 0 ? (
-          <View style={styles.block}>
-            <Text style={styles.blockHeading}>Enter Details</Text>
-            <Text style={styles.smallNote}>Min withdrawal: ₹{minWithdrawal.toLocaleString('en-IN')}. Max: ₹{maxWithdrawal.toLocaleString('en-IN')}.</Text>
-            <Text style={styles.label}>Amount to withdraw</Text>
-            <TextInput style={styles.input} keyboardType="number-pad" placeholder="Amount to withdraw" placeholderTextColor="#7f8ca0" value={amount} onChangeText={txt => setAmount(txt.replace(/[^\d.]/g, ''))} />
-
-            <Text style={styles.label}>Note (optional, max 200 characters)</Text>
-            <TextInput style={styles.input} placeholder="Note (optional)" placeholderTextColor="#7f8ca0" value={note} onChangeText={txt => setNote(txt.slice(0, 200))} />
-
-            <Text style={styles.label}>OTP (sent to your registered mobile)</Text>
-            <View style={styles.otpRow}>
-              <TextInput style={[styles.input, { flex: 1 }]} keyboardType="number-pad" placeholder="Enter 6-digit OTP" placeholderTextColor="#7f8ca0" value={otp} onChangeText={txt => setOtp(txt.replace(/\D/g, '').slice(0, 6))} />
-              <Pressable style={styles.otpBtn} onPress={() => void handleSendOtp()} disabled={otpLoading}>
-                <Text style={styles.otpBtnText}>{otpLoading ? 'Sending...' : 'Send OTP'}</Text>
-              </Pressable>
-            </View>
-
-            <Pressable style={[styles.submitBtn, (submitLoading || !otpSent) && styles.disabledBtn]} onPress={() => void handleWithdrawalSubmit()} disabled={submitLoading || !otpSent}>
-              <Text style={styles.submitBtnText}>{submitLoading ? 'Submitting...' : 'Request Withdrawal'}</Text>
-            </Pressable>
-          </View>
-        ) : null}
       </ScrollView>
     </View>
   )
@@ -308,6 +338,36 @@ const styles = StyleSheet.create({
     backgroundColor: '#D56E2A',
   },
   addBankLinkText: { color: '#fff', fontFamily: AppFonts.montserratSemiBold, fontSize: 13 },
+  demoBanner: {
+    backgroundColor: 'rgba(213,110,42,0.15)',
+    borderColor: '#D56E2A',
+    borderWidth: 1,
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  demoBannerText: {
+    color: '#D56E2A',
+    fontFamily: AppFonts.montserratSemiBold,
+    fontSize: 13,
+  },
+  demoOnlyContainer: {
+    marginTop: 10,
+    gap: 15,
+  },
+  backBtn: {
+    alignSelf: 'flex-start',
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: '#314157',
+    backgroundColor: '#1a2433',
+    paddingHorizontal: 18,
+    paddingVertical: 8,
+    marginTop: 4,
+  },
+  backBtnText: { color: '#DDE8F7', fontFamily: AppFonts.montserratSemiBold, fontSize: 13 },
 })
 
 export default WithdrawalScreen

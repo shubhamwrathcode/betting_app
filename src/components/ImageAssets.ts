@@ -235,6 +235,8 @@ export const ImageAssets = {
   indiaflag: require('../../assets/AppImages/indiaflag.png'),
   bin: require('../../assets/AppImages/bin.png'),
   backImg: require('../../assets/AppImages/backImg.png'),
+  cricketBet: require('../../assets/AppImages/cricketBet.png'),
+
 
 
 
@@ -265,6 +267,5 @@ export const ImageAssets = {
   vidBaccarat: require('../../assets/AppImages/freepik_create-a-glamorous-and-highend-animated-promo-vide_minimax_768p_16-9_24fps_68690.mp4'),
   vidRoulette: require('../../assets/AppImages/freepik_create-a-vibrant-animated-promo-video-using-this-c_kling_1080p_16-9_24fps_68692.mp4'),
   vidTeenPatti: require('../../assets/AppImages/freepik_create-a-stylish-and-engaging-animated-promo-video_kling_1080p_16-9_24fps_68691.mp4'),
-
 } as const
 

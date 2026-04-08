@@ -9,7 +9,8 @@ import { apiClient } from '../../api/client'
 
 const SportsbookScreen = () => {
   const navigation = useNavigation<any>()
-  const { isAuthenticated } = useAuth()
+  const { isAuthenticated, user } = useAuth()
+  const isDemoUser = (user as any)?.role === 'demo' || (user as any)?.isDemo === true
   const launchCalledRef = useRef(false)
   const [launchURL, setLaunchURL] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
@@ -20,6 +21,9 @@ const SportsbookScreen = () => {
       setLoading(false)
       setError('Please login to open SportsBook.')
       return
+    }
+    if (isDemoUser) {
+      // Allow demo viewing
     }
     if (launchCalledRef.current) return
     launchCalledRef.current = true

@@ -4,6 +4,7 @@ import {
   Dimensions,
   FlatList,
   Image,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -321,26 +322,39 @@ const InPlayScreen = () => {
     return () => { remove(); unsubscribeMatchDataLandingAll(); }
   }, [])
 
-  // REST Prefetch
+  // REST Prefetch - Now non-blocking, updates sports as they arrive
   useEffect(() => {
     let mounted = true
-    const load = async () => {
+    const loadSport = async (sport: 'Cricket' | 'Tennis' | 'Soccer') => {
       try {
-        const [c, t, s] = await Promise.all([
-          sportsbookService.getCricketMatches(),
-          sportsbookService.getTennisMatches(),
-          sportsbookService.getSoccerMatches(),
-        ])
+        let data: any[] = []
+        if (sport === 'Cricket') data = await sportsbookService.getCricketMatches()
+        else if (sport === 'Tennis') data = await sportsbookService.getTennisMatches()
+        else data = await sportsbookService.getSoccerMatches()
+
         if (!mounted) return
-        cricketRef.current = c as any[];
-        tennisRef.current = t as any[];
-        soccerRef.current = s as any[];
-        setCricketMatches(c as any[]);
-        setTennisMatches(t as any[]);
-        setSoccerMatches(s as any[]);
-      } catch { } finally { if (mounted) setLoading(false) }
+        if (sport === 'Cricket') {
+          cricketRef.current = data
+          setCricketMatches(data)
+        } else if (sport === 'Tennis') {
+          tennisRef.current = data
+          setTennisMatches(data)
+        } else {
+          soccerRef.current = data
+          setSoccerMatches(data)
+        }
+      } catch (err) {
+        console.warn(`[InPlayScreen] Failed to fetch ${sport} matches:`, err)
+      } finally {
+        if (mounted) setLoading(false)
+      }
     }
-    load(); return () => { mounted = false }
+
+    loadSport('Cricket')
+    loadSport('Tennis')
+    loadSport('Soccer')
+
+    return () => { mounted = false }
   }, [])
 
   useEffect(() => {
@@ -385,6 +399,92 @@ const InPlayScreen = () => {
   const leftW = useMemo(() => Math.min(270, Math.round(winW * 0.58)), [winW]);
   const metaW = 76;
 
+  const renderMatchRow = useCallback(({ item }: { item: any }) => {
+    const { row, eventTime, stripCols, rowKey } = item;
+    return (
+      <View style={styles.combinedRow}>
+        <InPlayTeamRow
+          row={row}
+          eventTime={eventTime}
+          leftW={leftW}
+          metaW={metaW}
+          onPress={() => onOpenSportsbookMatch(row)}
+        />
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          bounces={false}
+          contentContainerStyle={{ width: stripPx }}
+        >
+          <InPlayOddsRow stripCols={stripCols} maxCols={maxCols} />
+        </ScrollView>
+      </View>
+    );
+  }, [leftW, metaW, onOpenSportsbookMatch, stripPx, maxCols]);
+
+  const renderHeader = () => (
+    <>
+      <View style={styles.bannerWrap}>
+        <FlatList
+          ref={sliderRef} data={BANNERS} horizontal pagingEnabled bounces={false}
+          showsHorizontalScrollIndicator={false} style={{ width: bannerWidth, alignSelf: 'center' }}
+          keyExtractor={(_, i) => `sports-banner-${i}`}
+          getItemLayout={(_, index) => ({ length: bannerWidth, offset: bannerWidth * index, index })}
+          renderItem={({ item }) => (
+            <View style={[styles.bannerSlide, { width: bannerWidth }]}>
+              <Image source={item} style={[styles.bannerImage, { width: bannerWidth }]} resizeMode="cover" />
+            </View>
+          )}
+        />
+        <View style={styles.dots}>
+          {BANNERS.map((_, i) => (
+            <Pressable key={i} style={[styles.dot, currentSlide === i && styles.dotActive]} onPress={() => setCurrentSlide(i)} />
+          ))}
+        </View>
+      </View>
+
+      <FlatList
+        data={TABS} horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabsRow}
+        keyExtractor={item => item.id}
+        renderItem={({ item }) => {
+          const isSportsbook = item.id === 'sportsbook'
+          const isActive = !isSportsbook && activeTab === item.id
+          return (
+            <Pressable style={[styles.tabBtn, isActive && styles.tabBtnActive]}
+              onPress={() => setActiveTab(item.id)}>
+              <View style={styles.tabIconWrap}>
+                {item.id === 'cricket' ? <CricketIcon width={16} height={16} /> :
+                  item.id === 'tennis' ? <TennisIcon width={16} height={16} /> :
+                    item.id === 'sportsbook' ? <SportsbookIcon width={16} height={16} /> :
+                      <Image source={ImageAssets.football} style={styles.tabIcon} resizeMode="contain" />}
+              </View>
+              <Text style={[styles.tabLabel, isActive && styles.tabLabelActive]}>{item.label}</Text>
+            </Pressable>
+          )
+        }}
+      />
+
+      <View style={styles.sectionHead}>
+        <View style={styles.sectionTitleWrap}>
+          <View style={styles.sectionIconWrap}>
+            {activeTab === 'tennis' ? <TennisIcon width={16} height={16} /> :
+              activeTab === 'soccer' ? <Image source={ImageAssets.football} style={styles.sectionIcon} resizeMode="contain" /> :
+                <CricketIcon width={16} height={16} />}
+          </View>
+          <Text style={styles.sectionTitle}>{activeTab === 'cricket' ? 'Cricket' : activeTab === 'tennis' ? 'Tennis' : 'Football'}</Text>
+        </View>
+        <View style={styles.filtersRow}>
+          {FILTERS.map(f => (
+            <Pressable key={f.id} style={[styles.filterBtn, sportsFilter === f.id && styles.filterBtnActive]}
+              onPress={() => setSportsFilter(prev => (prev === f.id ? '' : f.id))}>
+              <Text style={[styles.filterText, sportsFilter === f.id && styles.filterTextActive]}>{f.label}</Text>
+            </Pressable>
+          ))}
+        </View>
+      </View>
+    </>
+  );
+
   return (
     <View style={styles.container}>
       <LandingHeader
@@ -393,90 +493,30 @@ const InPlayScreen = () => {
         onSearchPress={() => navigation.navigate('Search')}
       />
 
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
-        <View style={styles.bannerWrap}>
-          <FlatList
-            ref={sliderRef} data={BANNERS} horizontal pagingEnabled bounces={false}
-            showsHorizontalScrollIndicator={false} style={{ width: bannerWidth, alignSelf: 'center' }}
-            keyExtractor={(_, i) => `sports-banner-${i}`}
-            getItemLayout={(_, index) => ({ length: bannerWidth, offset: bannerWidth * index, index })}
-            renderItem={({ item }) => (
-              <View style={[styles.bannerSlide, { width: bannerWidth }]}>
-                <Image source={item} style={[styles.bannerImage, { width: bannerWidth }]} resizeMode="cover" />
-              </View>
-            )}
-          />
-          <View style={styles.dots}>
-            {BANNERS.map((_, i) => (
-              <Pressable key={i} style={[styles.dot, currentSlide === i && styles.dotActive]} onPress={() => setCurrentSlide(i)} />
-            ))}
-          </View>
+      {loading && activeMatches.length === 0 ? (
+        <View style={styles.centerState}>
+          <ActivityIndicator color="#2E90FA" />
+          <Text style={styles.stateText}>Loading matches...</Text>
         </View>
-
+      ) : (
         <FlatList
-          data={TABS} horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabsRow}
-          keyExtractor={item => item.id}
-          renderItem={({ item }) => {
-            const isSportsbook = item.id === 'sportsbook'
-            const isActive = !isSportsbook && activeTab === item.id
-            return (
-              <Pressable style={[styles.tabBtn, isActive && styles.tabBtnActive]}
-                onPress={() => setActiveTab(item.id)}>
-                <View style={styles.tabIconWrap}>
-                  {item.id === 'cricket' ? <CricketIcon width={16} height={16} /> :
-                    item.id === 'tennis' ? <TennisIcon width={16} height={16} /> :
-                      item.id === 'sportsbook' ? <SportsbookIcon width={16} height={16} /> :
-                        <Image source={ImageAssets.football} style={styles.tabIcon} resizeMode="contain" />}
-                </View>
-                <Text style={[styles.tabLabel, isActive && styles.tabLabelActive]}>{item.label}</Text>
-              </Pressable>
-            )
-          }}
+          data={rowsPrep}
+          renderItem={renderMatchRow}
+          keyExtractor={item => item.rowKey}
+          ListHeaderComponent={renderHeader}
+          contentContainerStyle={styles.content}
+          showsVerticalScrollIndicator={false}
+          initialNumToRender={10}
+          maxToRenderPerBatch={10}
+          windowSize={5}
+          removeClippedSubviews={Platform.OS === 'android'}
+          ListEmptyComponent={() => (
+            <View style={styles.centerState}>
+              <Text style={styles.stateText}>No matches available</Text>
+            </View>
+          )}
         />
-
-        <View style={styles.sectionHead}>
-          <View style={styles.sectionTitleWrap}>
-            <View style={styles.sectionIconWrap}>
-              {activeTab === 'tennis' ? <TennisIcon width={16} height={16} /> :
-                activeTab === 'soccer' ? <Image source={ImageAssets.football} style={styles.sectionIcon} resizeMode="contain" /> :
-                  <CricketIcon width={16} height={16} />}
-            </View>
-            <Text style={styles.sectionTitle}>{activeTab === 'cricket' ? 'Cricket' : activeTab === 'tennis' ? 'Tennis' : 'Football'}</Text>
-          </View>
-          <View style={styles.filtersRow}>
-            {FILTERS.map(f => (
-              <Pressable key={f.id} style={[styles.filterBtn, sportsFilter === f.id && styles.filterBtnActive]}
-                onPress={() => setSportsFilter(prev => (prev === f.id ? '' : f.id))}>
-                <Text style={[styles.filterText, sportsFilter === f.id && styles.filterTextActive]}>{f.label}</Text>
-              </Pressable>
-            ))}
-          </View>
-        </View>
-
-        {loading ? (
-          <View style={styles.centerState}><ActivityIndicator color="#2E90FA" /><Text style={styles.stateText}>Loading matches...</Text></View>
-        ) : activeMatches.length === 0 ? (
-          <View style={styles.centerState}><Text style={styles.stateText}>No matches available</Text></View>
-        ) : (
-          <View style={styles.listWrap}>
-            <View style={[styles.matchBlockRow, { width: winW }]}>
-              <View style={[styles.matchLeftCol, { width: leftW }]}>
-                {rowsPrep.map(({ row, eventTime, rowKey }) => (
-                  <InPlayTeamRow key={rowKey} row={row} eventTime={eventTime} leftW={leftW} metaW={metaW} onPress={() => onOpenSportsbookMatch(row)} />
-                ))}
-              </View>
-              <ScrollView horizontal nestedScrollEnabled showsHorizontalScrollIndicator={false}
-                contentContainerStyle={[styles.oddsOnlyHScrollInner, { width: stripPx }]}>
-                <View style={styles.oddsOnlyCol}>
-                  {rowsPrep.map(({ stripCols, rowKey }) => (
-                    <InPlayOddsRow key={`${rowKey}-odds`} stripCols={stripCols} maxCols={maxCols} />
-                  ))}
-                </View>
-              </ScrollView>
-            </View>
-          </View>
-        )}
-      </ScrollView>
+      )}
     </View>
   )
 }
@@ -515,14 +555,15 @@ const styles = StyleSheet.create({
   filterTextActive: { color: '#FFD2A6' },
   centerState: { paddingVertical: 40, alignItems: 'center', gap: 8 },
   stateText: { color: '#9FB0C9', fontFamily: AppFonts.montserratRegular, fontSize: 12 },
-  listWrap: { marginTop: 12, marginHorizontal: -12 },
+  listWrap: { marginTop: 12 },
+  combinedRow: { flexDirection: 'row', alignItems: 'stretch' },
   matchBlockRow: { flexDirection: 'row', alignItems: 'flex-start' },
   matchLeftCol: { flexShrink: 0 },
   oddsOnlyHScrollInner: { flexGrow: 0, paddingRight: 1 },
   oddsOnlyCol: { flexDirection: 'column' },
   oddsRow: { backgroundColor: '#0b1620', borderBottomWidth: 0.7, borderBottomColor: '#ffffff', alignItems: 'stretch' },
-  matchRow: { flexDirection: 'row', alignItems: 'stretch', backgroundColor: '#11161c', borderBottomWidth: 0.7, borderBottomColor: '#ffffff' },
-  matchMeta: { paddingVertical: 8, paddingHorizontal: 6, justifyContent: 'flex-end', borderRightWidth: 0.8, borderRightColor: "white" },
+  matchRow: { flexDirection: 'row', alignItems: 'stretch', backgroundColor: '#11161c', borderBottomWidth: 0.7, borderBottomColor: '#1c2f4a' },
+  matchMeta: { paddingVertical: 8, paddingHorizontal: 6, justifyContent: 'flex-end', borderRightWidth: 0.8, borderRightColor: "#1c2f4a" },
   matchTeamsBox: { flex: 1, minWidth: 0, paddingVertical: 6, paddingHorizontal: 6, justifyContent: 'flex-end' },
   matchInfoTitleRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'flex-start', gap: 4, marginBottom: 4 },
   matchTeamsLine1: { color: '#FFFFFF', fontSize: 11, fontFamily: AppFonts.montserratSemiBold, lineHeight: 16 },

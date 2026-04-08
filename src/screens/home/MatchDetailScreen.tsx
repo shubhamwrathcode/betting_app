@@ -12,11 +12,13 @@ import {
   View,
 } from 'react-native'
 import { useRoute, useNavigation } from '@react-navigation/native'
+import Toast from 'react-native-toast-message'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { AppFonts } from '../../components/AppFonts'
 import { ImageAssets } from '../../components/ImageAssets'
 import {
   fetchSportsbookEventConfig,
+  fetchSportsbookOpenBets,
   marketNameForPlaceBet,
   postSportsbookPlaceBet,
   unwrapPlaceBetResponse,
@@ -30,6 +32,8 @@ import {
   subscribeMatchDataDetail,
   unsubscribeMatchDataDetail,
 } from '../../socket/matchDataSocket'
+import { WebView } from 'react-native-webview'
+import { collectMarketBets, computeOutcomePlTable } from '../../utils/betExposure'
 
 type MatchDetailParams = {
   sportName?: string
@@ -106,14 +110,105 @@ function flattenBookMakerOdds(raw: unknown): any[] {
   return out
 }
 
-function formatMinMaxLabel(obj: Record<string, unknown> | null | undefined): string {
+function formatStakeCompact(v: any) {
+  if (v == null || v === '') return ''
+  const n = Number(v)
+  if (!Number.isFinite(n)) return String(v).trim()
+  const abs = Math.abs(n)
+  if (abs >= 1000000) return `${(n / 1000000).toFixed(2).replace(/\.?0+$/, '')}M`
+  if (abs >= 1000) return `${(n / 1000).toFixed(2).replace(/\.?0+$/, '')}K`
+  return String(n)
+}
+
+function pickLimitField(obj: any, keys: string[]) {
+  if (!obj || typeof obj !== 'object') return undefined
+  for (const k of keys) {
+    if (!(k in obj)) continue
+    const v = obj[k]
+    if (v === undefined || v === null || v === '') continue
+    return v
+  }
+  return undefined
+}
+
+const MIN_KEYS = ['minbet', 'minBet', 'min_bet', 'minStake', 'min_stake', 'min']
+const MAX_KEYS = ['maxbet', 'maxBet', 'max_bet', 'maxStake', 'max_stake', 'max']
+
+function aggregateNumericLimitsFromOddDatas(arr: any[]) {
+  if (!Array.isArray(arr) || arr.length === 0) return { min: null, max: null }
+  let minStake: number | null = null
+  let maxStake: number | null = null
+  for (const row of arr) {
+    if (!row || typeof row !== 'object') continue
+    const minR = pickLimitField(row, MIN_KEYS)
+    const maxR = pickLimitField(row, MAX_KEYS)
+    if (minR != null && minR !== '') {
+      const n = Number(minR)
+      if (Number.isFinite(n) && n > 0) minStake = minStake == null ? n : Math.min(minStake, n)
+    }
+    if (maxR != null && maxR !== '') {
+      const n = Number(maxR)
+      if (Number.isFinite(n) && n > 0) maxStake = maxStake == null ? n : Math.max(maxStake, n)
+    }
+  }
+  return { min: minStake, max: maxStake }
+}
+
+function minMaxLabelFromOddDatas(arr: any[]) {
+  const { min, max } = aggregateNumericLimitsFromOddDatas(arr)
+  const minS = min != null ? formatStakeCompact(min) : ''
+  const maxS = max != null ? formatStakeCompact(max) : ''
+  if (minS && maxS) return `MIN: ${minS} MAX: ${maxS}`
+  if (minS) return `MIN: ${minS}`
+  if (maxS) return `MAX: ${maxS}`
+  return ''
+}
+
+function minMaxFromObject(obj: any): string {
   if (!obj || typeof obj !== 'object') return ''
-  const min = obj.minBet ?? obj.min_bet ?? obj.minStake ?? obj.min ?? obj.minbet
-  const max = obj.maxBet ?? obj.max_bet ?? obj.maxStake ?? obj.max ?? obj.maxbet
-  const smin = min != null && min !== '' ? String(min) : ''
-  const smax = max != null && max !== '' ? String(max) : ''
+  const minRaw = pickLimitField(obj, MIN_KEYS)
+  const maxRaw = pickLimitField(obj, MAX_KEYS)
+  const isMeaningless = (minRaw == null || Number(minRaw) === 0) && (maxRaw == null || Number(maxRaw) === 0)
+  const runners = obj.oddDatas ?? obj.runners
+  if (isMeaningless && Array.isArray(runners) && runners.length) {
+    return minMaxLabelFromOddDatas(runners)
+  }
+  const smin = formatStakeCompact(minRaw)
+  const smax = formatStakeCompact(maxRaw)
   if (!smin && !smax) return ''
   return `MIN: ${smin || '—'} MAX: ${smax || '—'}`
+}
+
+function formatMinMaxLabel(market: any, payloadFallback?: any): string {
+  const direct = minMaxFromObject(market)
+  if (direct) return direct
+  if (!payloadFallback || typeof payloadFallback !== 'object') return ''
+  const root = minMaxFromObject(payloadFallback)
+  if (root) return root
+  
+  // Aggressive fallback to other markets in the same payload
+  const mo = payloadFallback.matchOdds ?? payloadFallback.match_odds
+  if (Array.isArray(mo)) {
+    for (const m of mo) {
+      const t = minMaxFromObject(m)
+      if (t) return t
+    }
+  }
+  const bm = payloadFallback.bookMakerOdds ?? payloadFallback.book_maker_odds
+  if (Array.isArray(bm)) {
+    for (const m of bm) {
+      const t = minMaxFromObject(m)
+      if (t) return t
+    }
+  }
+  const fo = payloadFallback.fancyOdds ?? payloadFallback.fancy_odds
+  if (Array.isArray(fo)) {
+    for (const m of fo) {
+      const t = minMaxFromObject(m)
+      if (t) return t
+    }
+  }
+  return ''
 }
 
 /** Same as web `oddDatasLenForNormalize`. */
@@ -189,6 +284,18 @@ type MatchDetailSelectedBet = {
 
 const QUICK_STAKES = [100, 200, 500, 1000, 2000, 5000, 10000, 25000]
 
+function ExposureLabel({ amount }: { amount: number }) {
+  if (amount === 0) return null
+  const color = amount > 0 ? '#16a34a' : '#dc2626'
+  const sign = amount > 0 ? '+' : ''
+  return (
+    <Text style={[styles.exposureText, { color }]}>
+      {sign}
+      {amount.toFixed(2)}
+    </Text>
+  )
+}
+
 type InlineBetSlipPanelProps = {
   selectedBet: MatchDetailSelectedBet
   eventNameForBets: string
@@ -201,6 +308,7 @@ type InlineBetSlipPanelProps = {
   calculateProfitLine: string
   placeBetError: string | null
   placeBetLoading: boolean
+  isDemoUser?: boolean
   stakeInputRef: React.RefObject<TextInput | null>
   onClear: () => void
   onPlaceBet: () => void
@@ -219,6 +327,7 @@ function InlineBetSlipPanel({
   calculateProfitLine,
   placeBetError,
   placeBetLoading,
+  isDemoUser,
   stakeInputRef,
   onClear,
   onPlaceBet,
@@ -371,11 +480,17 @@ function InlineBetSlipPanel({
       {placeBetError ? <Text style={styles.slipError}>{placeBetError}</Text> : null}
 
       <Pressable
-        style={[styles.placeBetBtn, placeBetLoading && { opacity: 0.7 }]}
+        style={[
+          styles.placeBetBtn,
+          (placeBetLoading || isDemoUser) && { opacity: 0.7 },
+          isDemoUser && { backgroundColor: '#4b5563', borderColor: '#374151' },
+        ]}
         onPress={onPlaceBet}
-        disabled={placeBetLoading}
+        disabled={placeBetLoading || isDemoUser}
       >
-        <Text style={styles.placeBetBtnText}>{placeBetLoading ? 'Placing…' : 'Place Bet'}</Text>
+        <Text style={styles.placeBetBtnText}>
+          {isDemoUser ? 'Login to Play' : placeBetLoading ? 'Placing…' : 'Place Bet'}
+        </Text>
       </Pressable>
     </View>
   )
@@ -711,6 +826,9 @@ function RunnerRows({
   selectedElementId,
   onSelectBet,
   betSlipBelow,
+  openBets,
+  selectedBetSlip,
+  slipStake,
 }: {
   market: any
   sportName: string
@@ -722,10 +840,21 @@ function RunnerRows({
   selectedElementId: string | null
   onSelectBet: (sel: MatchDetailSelectedBet) => void
   betSlipBelow?: (elIdBack: string, elIdLay: string) => React.ReactNode
+  openBets: any[]
+  selectedBetSlip?: MatchDetailSelectedBet | null
+  slipStake?: string
 }) {
   const runners = toOddDatasArray(market?.oddDatas)
   const marketId = pickMarketId(market)
   const marketTitle = String(market.marketName ?? market.mname ?? market.market ?? market.name ?? 'Market')
+
+  const marketBets = useMemo(() => {
+    if (!marketId) return []
+    return collectMarketBets({ openBets, marketId: String(marketId), selectedBet: selectedBetSlip, stake: slipStake })
+  }, [openBets, marketId, selectedBetSlip, slipStake])
+
+  const outcomes = useMemo(() => runners.map(r => runnerLabel(r)), [runners])
+  const exposureMap = useMemo(() => computeOutcomePlTable(marketBets, outcomes), [marketBets, outcomes])
 
   if (!runners.length) {
     return (
@@ -772,9 +901,10 @@ function RunnerRows({
           <Fragment key={elIdBack}>
             <View style={styles.runnerRow}>
               <View style={styles.runnerNameWrap}>
-                <Text style={styles.runnerName} numberOfLines={3}>
+                <Text style={styles.runnerName} numberOfLines={2}>
                   {name}
                 </Text>
+                <ExposureLabel amount={exposureMap[name] || 0} />
               </View>
               <MobileOddsCell
                 price={back.p}
@@ -785,14 +915,14 @@ function RunnerRows({
                 onPress={
                   canBack
                     ? () =>
-                        onSelectBet({
-                          elementId: elIdBack,
-                          betName: name,
-                          marketLabel: marketTitle,
-                          odds: oddsBack,
-                          betType: 'back',
-                          placePayload: { ...basePayload, betType: 'back', odds: oddsBack },
-                        })
+                      onSelectBet({
+                        elementId: elIdBack,
+                        betName: name,
+                        marketLabel: marketTitle,
+                        odds: oddsBack,
+                        betType: 'back',
+                        placePayload: { ...basePayload, betType: 'back', odds: oddsBack },
+                      })
                     : undefined
                 }
               />
@@ -805,14 +935,14 @@ function RunnerRows({
                 onPress={
                   canLay
                     ? () =>
-                        onSelectBet({
-                          elementId: elIdLay,
-                          betName: name,
-                          marketLabel: marketTitle,
-                          odds: oddsLay,
-                          betType: 'lay',
-                          placePayload: { ...basePayload, betType: 'lay', odds: oddsLay },
-                        })
+                      onSelectBet({
+                        elementId: elIdLay,
+                        betName: name,
+                        marketLabel: marketTitle,
+                        odds: oddsLay,
+                        betType: 'lay',
+                        placePayload: { ...basePayload, betType: 'lay', odds: oddsLay },
+                      })
                     : undefined
                 }
               />
@@ -835,6 +965,9 @@ function FancyNormalRows({
   selectedElementId,
   onSelectBet,
   betSlipBelow,
+  openBets,
+  selectedBetSlip,
+  slipStake,
 }: {
   rows: FancyDisplayRow[]
   /** Web section id: sessions, wp, extra, odd_even — keeps elementIds unique across blocks. */
@@ -846,7 +979,12 @@ function FancyNormalRows({
   selectedElementId: string | null
   onSelectBet: (sel: MatchDetailSelectedBet) => void
   betSlipBelow?: (elIdBack: string, elIdLay: string) => React.ReactNode
+  openBets: any[]
+  selectedBetSlip?: MatchDetailSelectedBet | null
+  slipStake?: string
 }) {
+
+
   if (!rows.length) {
     return (
       <View style={styles.emptyMarket}>
@@ -873,6 +1011,12 @@ function FancyNormalRows({
           !isOddsLockedStr(r.layP) &&
           oddsLay >= 1.01
 
+        // Per-row exposure for Session/Fancy
+        const marketIdStr = String(r.marketId || '')
+        const rowBets = marketIdStr ? collectMarketBets({ openBets, marketId: marketIdStr, selectedBet: selectedBetSlip, stake: slipStake }) : []
+        const rowExposure = computeOutcomePlTable(rowBets, [r.label])
+        const pl = rowExposure[r.label] || 0
+
         const basePayload = (betType: 'back' | 'lay', selectionId: string, odds: number) => ({
           sport: sportName,
           gameId: placeBetGameId,
@@ -888,12 +1032,13 @@ function FancyNormalRows({
         })
 
         return (
-          <Fragment key={`${elIdBack}-${i}`}>
+          <Fragment key={`${sectionKey}-${i}-back`}>
             <View style={styles.runnerRow}>
               <View style={styles.runnerNameWrap}>
-                <Text style={styles.runnerName} numberOfLines={4}>
+                <Text style={styles.runnerName} numberOfLines={2}>
                   {r.label}
                 </Text>
+                <ExposureLabel amount={pl} />
               </View>
               <MobileOddsCell
                 price={r.backP}
@@ -904,16 +1049,16 @@ function FancyNormalRows({
                 onPress={
                   canBack && r.backSelectionId
                     ? () => {
-                        const sid = r.backSelectionId as string
-                        onSelectBet({
-                          elementId: elIdBack,
-                          betName: r.label,
-                          marketLabel: r.marketName,
-                          odds: oddsBack,
-                          betType: 'back',
-                          placePayload: basePayload('back', sid, oddsBack),
-                        })
-                      }
+                      const sid = r.backSelectionId as string
+                      onSelectBet({
+                        elementId: elIdBack,
+                        betName: r.label,
+                        marketLabel: r.marketName,
+                        odds: oddsBack,
+                        betType: 'back',
+                        placePayload: basePayload('back', sid, oddsBack),
+                      })
+                    }
                     : undefined
                 }
               />
@@ -926,16 +1071,16 @@ function FancyNormalRows({
                 onPress={
                   canLay && r.laySelectionId
                     ? () => {
-                        const sid = r.laySelectionId as string
-                        onSelectBet({
-                          elementId: elIdLay,
-                          betName: r.label,
-                          marketLabel: r.marketName,
-                          odds: oddsLay,
-                          betType: 'lay',
-                          placePayload: basePayload('lay', sid, oddsLay),
-                        })
-                      }
+                      const sid = r.laySelectionId as string
+                      onSelectBet({
+                        elementId: elIdLay,
+                        betName: r.label,
+                        marketLabel: r.marketName,
+                        odds: oddsLay,
+                        betType: 'lay',
+                        placePayload: basePayload('lay', sid, oddsLay),
+                      })
+                    }
                     : undefined
                 }
               />
@@ -960,6 +1105,9 @@ function BackOnlyRows({
   selectedElementId,
   onSelectBet,
   betSlipBelow,
+  openBets,
+  selectedBetSlip,
+  slipStake,
 }: {
   blockKey: string
   market: any
@@ -971,7 +1119,18 @@ function BackOnlyRows({
   selectedElementId: string | null
   onSelectBet: (sel: MatchDetailSelectedBet) => void
   betSlipBelow?: (elIdBack: string, elIdLay: string) => React.ReactNode
+  openBets: any[]
+  selectedBetSlip?: MatchDetailSelectedBet | null
+  slipStake?: string
 }) {
+  const marketBets = useMemo(() => {
+    if (!market) return []
+    return collectMarketBets({ openBets, marketId: String(blockKey), selectedBet: selectedBetSlip, stake: slipStake })
+  }, [openBets, blockKey, selectedBetSlip, slipStake, market])
+
+  const outcomes = useMemo(() => rows.map(r => r.label), [rows])
+  const exposureMap = useMemo(() => computeOutcomePlTable(marketBets, outcomes), [marketBets, outcomes])
+
   const marketId = pickMarketId(market)
   const marketTitle = String(market.marketName ?? market.mname ?? market.market ?? market.name ?? 'Market')
 
@@ -1012,9 +1171,10 @@ function BackOnlyRows({
           <Fragment key={elId}>
             <View style={styles.runnerRow}>
               <View style={styles.runnerNameWrap}>
-                <Text style={styles.runnerName} numberOfLines={4}>
+                <Text style={styles.runnerName} numberOfLines={2}>
                   {row.label}
                 </Text>
+                <ExposureLabel amount={exposureMap[row.label] || 0} />
               </View>
               <View style={styles.backOnlyCellWrap}>
                 {overlay ? (
@@ -1031,14 +1191,14 @@ function BackOnlyRows({
                     onPress={
                       canBack && row.selectionId
                         ? () =>
-                            onSelectBet({
-                              elementId: elId,
-                              betName: row.label,
-                              marketLabel: marketTitle,
-                              odds: oddsNum,
-                              betType: 'back',
-                              placePayload: { ...basePayload, betType: 'back', odds: oddsNum },
-                            })
+                          onSelectBet({
+                            elementId: elId,
+                            betName: row.label,
+                            marketLabel: marketTitle,
+                            odds: oddsNum,
+                            betType: 'back',
+                            placePayload: { ...basePayload, betType: 'back', odds: oddsNum },
+                          })
                         : undefined
                     }
                   />
@@ -1082,11 +1242,106 @@ const MatchDetailScreen = () => {
   const [placeBetLoading, setPlaceBetLoading] = useState(false)
   const [placeBetError, setPlaceBetError] = useState<string | null>(null)
 
-  const headerTitle =
-    params.eventName ||
-    params.seriesName ||
-    normalizeOddsPayload(matchPayload || {}).eventName ||
-    'Match'
+  const headerTitle = useMemo(() => {
+    const t = (v: unknown) => (v == null ? '' : String(v).trim())
+    return (
+      t(params.eventName) ||
+      t(normalizeOddsPayload(matchPayload || {}).eventName) ||
+      t(matchPayload?.eventName ?? matchPayload?.event_name ?? matchPayload?.matchName) ||
+      'Match'
+    )
+  }, [params.eventName, matchPayload])
+
+  const [openBets, setOpenBets] = useState<any[]>([])
+  const [tvMode, setTvMode] = useState<'none' | 'tv' | 'score'>('none')
+
+  const pullOpenBets = useCallback(async () => {
+    if (!isAuthenticated) return
+    const bets = await fetchSportsbookOpenBets()
+    setOpenBets(bets)
+  }, [isAuthenticated])
+
+  const professorjiSportParam = useMemo(() => {
+    if (sportName === 'soccer') return 'football'
+    return sportName
+  }, [sportName])
+
+  const scoreUrl = useMemo(() => {
+    if (!eventId) return null
+    if (sportName === 'tennis' || sportName === 'soccer') return `https://cricketbz.app/iframe/${eventId}`
+    return `https://score.akamaized.uk/?id=${eventId}&sport=${professorjiSportParam}&matchName=${encodeURIComponent(headerTitle)}`
+  }, [eventId, sportName, professorjiSportParam, headerTitle])
+
+  const tvUrl = useMemo(() => {
+    if (!eventId) return null
+    return `https://apis.professorji.in/api/tv?eventId=${eventId}&sport=${professorjiSportParam}`
+  }, [eventId, professorjiSportParam])
+
+  useEffect(() => {
+    pullOpenBets()
+  }, [pullOpenBets, gameId])
+
+  useEffect(() => {
+    const onBetUpdate = () => pullOpenBets()
+    const sub = navigation.addListener('focus', onBetUpdate)
+    // Custom socket event listener
+    const timer = setInterval(pullOpenBets, 30000)
+    return () => {
+      sub()
+      clearInterval(timer)
+    }
+  }, [pullOpenBets, navigation])
+
+  // Sync slip odds with live market price
+  useEffect(() => {
+    if (!selectedBet || !matchPayload) return
+    const p = selectedBet.placePayload
+    const normalized = normalizeOddsPayload(matchPayload)
+    let liveOdds: number | null = null
+
+    const findPrice = (m: any) => {
+      if (!m || String(pickMarketId(m)) !== String(p.marketId)) return null
+      const runners = toOddDatasArray(m.oddDatas)
+      const r = runners.find(x => String(pickSelectionId(x)) === String(p.selectionId))
+      if (!r) return null
+      const { back, lay } = pickBestBackLay(r)
+      const priceStr = (p.betType === 'lay' ? lay.p : back.p)
+      const n = parseFloat(priceStr)
+      return (Number.isFinite(n) && n >= 1.01) ? n : null
+    }
+
+    if (p.marketType === 'match_odds') {
+      const m = normalized.matchOdds?.[0]
+      liveOdds = findPrice(m)
+    } else if (p.marketType === 'bookmaker') {
+      const m = normalized.bookMakerOdds?.find(x => String(pickMarketId(x)) === String(p.marketId))
+      liveOdds = findPrice(m)
+    } else if (p.marketType === 'fancy') {
+      // Fancy/Mini sections
+      const fm = normalized.fancyMiniMarkets?.find(x => String(pickMarketId(x)) === String(p.marketId))
+      if (fm) {
+        liveOdds = findPrice(fm)
+      } else {
+        // Individual session rows
+        const allRows = [
+          ...normalized.sessionsFancyRows,
+          ...normalized.wpFancyRows,
+          ...normalized.extraFancyRows,
+          ...normalized.oddEvenFancyRows
+        ]
+        const row = allRows.find(x => String(x.marketId) === String(p.marketId))
+        if (row) {
+          const priceStr = (p.betType === 'lay' ? row.layP : row.backP)
+          const n = parseFloat(priceStr)
+          if (Number.isFinite(n) && n >= 1.01) liveOdds = n
+        }
+      }
+    }
+
+    if (liveOdds != null && liveOdds !== slipOdds) {
+      setSlipOdds(liveOdds)
+    }
+  }, [matchPayload, selectedBet, slipOdds])
 
   const eventNameForBets = useMemo(() => {
     const t = (v: unknown) => (v == null ? '' : String(v).trim())
@@ -1164,11 +1419,23 @@ const MatchDetailScreen = () => {
     }
   }, [oddsId])
 
-  const onSelectBet = useCallback((sel: MatchDetailSelectedBet) => {
-    setSelectedBet(sel)
-    setSlipOdds(sel.odds >= 1.01 ? sel.odds : null)
-    setPlaceBetError(null)
-  }, [])
+  const onSelectBet = useCallback(
+    (sel: MatchDetailSelectedBet) => {
+      if (!isAuthenticated) {
+        Toast.show({
+          type: 'info',
+          text1: 'Login Required',
+          text2: 'Please login to place a bet',
+          position: 'top',
+        })
+        return
+      }
+      setSelectedBet(sel)
+      setSlipOdds(sel.odds >= 1.01 ? sel.odds : null)
+      setPlaceBetError(null)
+    },
+    [isAuthenticated],
+  )
 
   const bumpSlipOdds = useCallback((delta: number) => {
     setSlipOdds(prev => {
@@ -1189,6 +1456,11 @@ const MatchDetailScreen = () => {
 
   const handlePlaceBet = useCallback(async () => {
     if (!isAuthenticated) {
+      navigation.navigate('Login', { initialTab: 'login' })
+      return
+    }
+    const isDemoUser = (user as any)?.role === 'demo' || (user as any)?.isDemo === true
+    if (isDemoUser) {
       navigation.navigate('Login', { initialTab: 'login' })
       return
     }
@@ -1291,6 +1563,7 @@ const MatchDetailScreen = () => {
           calculateProfitLine={calculateProfitLine}
           placeBetError={placeBetError}
           placeBetLoading={placeBetLoading}
+          isDemoUser={(user as any)?.role === 'demo' || (user as any)?.isDemo === true}
           stakeInputRef={stakeInputRef}
           onClear={clearBetSlip}
           onPlaceBet={handlePlaceBet}
@@ -1326,7 +1599,7 @@ const MatchDetailScreen = () => {
     <View style={styles.page}>
       <View style={[styles.topBar, { paddingTop: Math.max(insets.top, 8) }]}>
         <Pressable hitSlop={12} onPress={() => navigation.goBack()} style={styles.backBtn}>
-        <Image source={ImageAssets.backImg} style={{width:24,height:24,tintColor:'#fff'}} resizeMode="contain" />
+          <Image source={ImageAssets.backImg} style={{ width: 24, height: 24, tintColor: '#fff' }} resizeMode="contain" />
         </Pressable>
         <Text style={styles.topSport}>{sportName === 'soccer' ? 'Football' : sportName}</Text>
         <View style={{ width: 56 }} />
@@ -1340,26 +1613,47 @@ const MatchDetailScreen = () => {
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
-        <ImageBackground
-          source={ImageAssets.herobgMainJpg}
-          style={styles.hero}
-          imageStyle={styles.heroImg}
-        >
-          <View style={styles.heroOverlay}>
-            <Text style={styles.heroTitle}>{headerTitle}</Text>
-            {minMaxHero ? <Text style={styles.heroSub}>{minMaxHero}</Text> : null}
-            <View style={styles.liveTvBox}>
-              <Text style={styles.liveTvTitle}>Live TV</Text>
-              <Text style={styles.liveTvHint}>Stream opens when available.</Text>
+        <View style={styles.streamingArea}>
+          {tvMode === 'none' ? (
+            <ImageBackground source={ImageAssets.herobgMainJpg} style={styles.hero} imageStyle={styles.heroImg}>
+              <View style={styles.heroOverlay}>
+                <Text style={styles.heroTitle}>{headerTitle}</Text>
+                {minMaxHero ? <Text style={styles.heroSub}>{minMaxHero}</Text> : null}
+                <View style={styles.streamingToggles}>
+                  {tvUrl && (
+                    <Pressable style={styles.streamBtn} onPress={() => setTvMode('tv')}>
+                      <Text style={styles.streamBtnText}>📺 Live TV</Text>
+                    </Pressable>
+                  )}
+                  {scoreUrl && (
+                    <Pressable style={styles.streamBtn} onPress={() => setTvMode('score')}>
+                      <Text style={styles.streamBtnText}>📊 Scoreboard</Text>
+                    </Pressable>
+                  )}
+                </View>
+              </View>
+            </ImageBackground>
+          ) : (
+            <View style={styles.webViewContainer}>
+              <WebView
+                source={{ uri: tvMode === 'tv' ? tvUrl! : scoreUrl! }}
+                style={styles.webView}
+                allowsFullscreenVideo
+                javaScriptEnabled
+                domStorageEnabled
+              />
+              <Pressable style={styles.closeStreamBtn} onPress={() => setTvMode('none')}>
+                <Text style={styles.closeStreamText}>✕ Close {tvMode === 'tv' ? 'TV' : 'Score'}</Text>
+              </Pressable>
             </View>
-          </View>
-        </ImageBackground>
+          )}
+        </View>
 
         <View style={styles.tabRow}>
           <View style={styles.tabMarkets}>
             <Text style={styles.tabMarketsText}>Markets</Text>
           </View>
-          <Text style={styles.openBets}>OPEN BETS (0)</Text>
+          <Text style={styles.openBets}>OPEN BETS ({openBets?.length})</Text>
         </View>
 
         {loading && !matchPayload ? (
@@ -1376,7 +1670,11 @@ const MatchDetailScreen = () => {
         ) : null}
 
         {matchMarket ? (
-          <MarketBlock icon="📊" title="Match" minMax={formatMinMaxLabel(matchMarket)}>
+          <MarketBlock
+            icon="🚀"
+            title="Match Odds"
+            minMax={formatMinMaxLabel(matchMarket, matchPayload)}
+          >
             <RunnerRows
               market={matchMarket}
               sportName={sportName}
@@ -1387,53 +1685,63 @@ const MatchDetailScreen = () => {
               selectedElementId={selectedBet?.elementId ?? null}
               onSelectBet={onSelectBet}
               betSlipBelow={betSlipBelow}
+              openBets={openBets}
+              selectedBetSlip={selectedBet}
+              slipStake={stake}
             />
           </MarketBlock>
         ) : null}
 
-        {bookMkts.map((bm: any, i: number) => (
+        {bookMkts.map((m: any, bi: number) => (
           <MarketBlock
-            key={`bm-${bm?.mid ?? bm?.marketId ?? i}`}
-            icon="🔧"
-            title="Bookmaker"
-            minMax={formatMinMaxLabel(bm)}
+            key={`bm-${bi}`}
+            icon="🛠️"
+            title="BOOKMAKER"
+            minMax={formatMinMaxLabel(m, matchPayload)}
           >
             <RunnerRows
-              market={bm}
+              market={m}
               sportName={sportName}
               placeBetGameId={placeBetGameId}
               eventNameForBets={eventNameForBets}
               seriesName={params.seriesName}
               marketTypeApi="bookmaker"
+              rowKeyPrefix={`bm-${bi}`}
               selectedElementId={selectedBet?.elementId ?? null}
               onSelectBet={onSelectBet}
               betSlipBelow={betSlipBelow}
+              openBets={openBets}
+              selectedBetSlip={selectedBet}
+              slipStake={stake}
             />
           </MarketBlock>
         ))}
 
         {fancyMiniMarkets.length > 0
           ? fancyMiniMarkets.map((fm: any, fi: number) => (
-              <MarketBlock
-                key={`fancy-mini-${pickMarketId(fm) ?? fi}-${fi}`}
-                icon="✨"
-                title={String(fm.marketName ?? fm.market ?? fm.mname ?? 'Fancy')}
-                minMax={formatMinMaxLabel(fm)}
-              >
-                <RunnerRows
-                  market={fm}
-                  sportName={sportName}
-                  placeBetGameId={placeBetGameId}
-                  eventNameForBets={eventNameForBets}
-                  seriesName={params.seriesName}
-                  marketTypeApi="fancy"
-                  rowKeyPrefix={`fmini-${fi}`}
-                  selectedElementId={selectedBet?.elementId ?? null}
-                  onSelectBet={onSelectBet}
-                  betSlipBelow={betSlipBelow}
-                />
-              </MarketBlock>
-            ))
+            <MarketBlock
+              key={`fancy-mini-${fm?.mid || fm?.marketId || fi}-${fi}`}
+              icon="🛠️"
+              title="MINI BOOKMAKER"
+              minMax={formatMinMaxLabel(fm, matchPayload)}
+            >
+              <RunnerRows
+                market={fm}
+                sportName={sportName}
+                placeBetGameId={placeBetGameId}
+                eventNameForBets={eventNameForBets}
+                seriesName={params.seriesName}
+                marketTypeApi="fancy"
+                rowKeyPrefix={`fmini-${fi}`}
+                selectedElementId={selectedBet?.elementId ?? null}
+                onSelectBet={onSelectBet}
+                betSlipBelow={betSlipBelow}
+                openBets={openBets}
+                selectedBetSlip={selectedBet}
+                slipStake={stake}
+              />
+            </MarketBlock>
+          ))
           : null}
 
         {isCricket && sessionsFancyRows.length > 0 ? (
@@ -1448,6 +1756,9 @@ const MatchDetailScreen = () => {
               selectedElementId={selectedBet?.elementId ?? null}
               onSelectBet={onSelectBet}
               betSlipBelow={betSlipBelow}
+              openBets={openBets}
+              selectedBetSlip={selectedBet}
+              slipStake={stake}
             />
           </MarketBlock>
         ) : null}
@@ -1464,6 +1775,9 @@ const MatchDetailScreen = () => {
               selectedElementId={selectedBet?.elementId ?? null}
               onSelectBet={onSelectBet}
               betSlipBelow={betSlipBelow}
+              openBets={openBets}
+              selectedBetSlip={selectedBet}
+              slipStake={stake}
             />
           </MarketBlock>
         ) : null}
@@ -1480,6 +1794,9 @@ const MatchDetailScreen = () => {
               selectedElementId={selectedBet?.elementId ?? null}
               onSelectBet={onSelectBet}
               betSlipBelow={betSlipBelow}
+              openBets={openBets}
+              selectedBetSlip={selectedBet}
+              slipStake={stake}
             />
           </MarketBlock>
         ) : null}
@@ -1496,42 +1813,42 @@ const MatchDetailScreen = () => {
               selectedElementId={selectedBet?.elementId ?? null}
               onSelectBet={onSelectBet}
               betSlipBelow={betSlipBelow}
+              openBets={openBets}
+              selectedBetSlip={selectedBet}
+              slipStake={stake}
             />
           </MarketBlock>
         ) : null}
 
         {isCricket
           ? backOnlyFancyBlocks.map((block: BackOnlyFancyBlock) => (
-              <MarketBlock
-                key={`bo-${block.key}`}
-                icon="📋"
-                title={block.title}
-                minMax={block.minMax}
-                columns="backOnly"
-              >
-                <BackOnlyRows
-                  blockKey={block.key}
-                  market={block.market}
-                  sportName={sportName}
-                  placeBetGameId={placeBetGameId}
-                  eventNameForBets={eventNameForBets}
-                  seriesName={params.seriesName}
-                  rows={block.rows}
-                  selectedElementId={selectedBet?.elementId ?? null}
-                  onSelectBet={onSelectBet}
-                  betSlipBelow={betSlipBelow}
-                />
-              </MarketBlock>
-            ))
+            <MarketBlock
+              key={`bo-${block.key}`}
+              icon="📋"
+              title={block.title}
+              minMax={block.minMax}
+              columns="backOnly"
+            >
+              <BackOnlyRows
+                blockKey={block.key}
+                market={block.market}
+                sportName={sportName}
+                placeBetGameId={placeBetGameId}
+                eventNameForBets={eventNameForBets}
+                seriesName={params.seriesName}
+                rows={block.rows}
+                selectedElementId={selectedBet?.elementId ?? null}
+                onSelectBet={onSelectBet}
+                betSlipBelow={betSlipBelow}
+                openBets={openBets}
+                selectedBetSlip={selectedBet}
+                slipStake={stake}
+              />
+            </MarketBlock>
+          ))
           : null}
       </ScrollView>
 
-      {/* {!selectedBet ? (
-        <View style={[styles.betSlipBar, { paddingBottom: Math.max(insets.bottom, 12) }]}>
-          <Text style={styles.betSlipTitle}>Bet slip</Text>
-          <Text style={styles.betSlipHint}>Tap Back or Lay — the bet form opens under that row.</Text>
-        </View>
-      ) : null} */}
     </View>
   )
 }
@@ -1546,7 +1863,7 @@ const styles = StyleSheet.create({
     paddingBottom: 8,
     backgroundColor: '#060d18',
     borderBottomWidth: 0.7,
-    borderBottomColor: '#ffffff',
+    borderBottomColor: '#1c2f4a',
   },
   backBtn: { paddingVertical: 6, paddingHorizontal: 4 },
   backText: { color: '#93C5FD', fontFamily: AppFonts.montserratSemiBold, fontSize: 14 },
@@ -1572,6 +1889,29 @@ const styles = StyleSheet.create({
     borderColor: '#1e3a5f',
     minWidth: 120,
   },
+  streamingArea: { width: '100%', minHeight: 160 },
+  streamingToggles: { flexDirection: 'row', gap: 10, marginTop: 12 },
+  streamBtn: {
+    backgroundColor: 'rgba(213, 110, 42, 0.9)',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#C45F24',
+  },
+  streamBtnText: { color: '#fff', fontFamily: AppFonts.montserratBold, fontSize: 12 },
+  webViewContainer: { height: 210, width: '100%', backgroundColor: '#000' },
+  webView: { flex: 1 },
+  closeStreamBtn: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    padding: 8,
+    borderRadius: 20,
+  },
+  closeStreamText: { color: '#fff', fontFamily: AppFonts.montserratSemiBold, fontSize: 10 },
+  exposureText: { fontFamily: AppFonts.montserratBold, fontSize: 11, marginTop: 2 },
   liveTvTitle: { color: '#E5E7EB', fontFamily: AppFonts.montserratBold, fontSize: 11 },
   liveTvHint: { color: '#6B7280', fontFamily: AppFonts.montserratRegular, fontSize: 9, marginTop: 2 },
   tabRow: {
@@ -1582,7 +1922,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     backgroundColor: '#060d18',
     borderBottomWidth: 0.7,
-    borderBottomColor: '#ffffff',
+    borderBottomColor: '#1c2f4a',
   },
   tabMarkets: {
     backgroundColor: '#16a34a',
@@ -1600,7 +1940,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     overflow: 'hidden',
     borderWidth: 0.7,
-    borderColor: '#ffffff',
+    borderColor: '#1c2f4a',
     backgroundColor: '#0f172a',
   },
   marketHead: {
@@ -1609,7 +1949,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 12,
     paddingVertical: 10,
-    backgroundColor: '#111827',
+    backgroundColor: '#1e2a38',
     gap: 10,
   },
   marketTitleRow: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8, minWidth: 0 },
@@ -1627,9 +1967,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 8,
     paddingHorizontal: 8,
-    backgroundColor: '#0c1524',
+    backgroundColor: '#1a2332',
     borderBottomWidth: 0.7,
-    borderBottomColor: '#ffffff',
+    borderBottomColor: '#1c2f4a',
   },
   colMarket: {
     flex: 1.15,
@@ -1656,11 +1996,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'stretch',
     borderBottomWidth: 0.7,
-    borderBottomColor: '#ffffff',
+    borderBottomColor: '#1c2f4a',
     paddingVertical: 6,
     paddingHorizontal: 6,
     gap: 6,
     minHeight: 56,
+    backgroundColor: '#1a2332'
   },
   backOnlyCellWrap: { flex: 2, minWidth: 0 },
   backOnlyLaySpacer: { flex: 1, minWidth: 0 },

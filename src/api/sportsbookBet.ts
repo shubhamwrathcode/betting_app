@@ -132,3 +132,32 @@ export function marketNameForPlaceBet(p: {
   if (t === 'fancy') return 'Fancy'
   return t ? t.replace(/_/g, ' ') : 'Market'
 }
+
+/** GET user's active bets for exposure/PNL display. */
+export async function fetchSportsbookOpenBets(query: {
+  page?: number
+  limit?: number
+} = { page: 1, limit: 100 }): Promise<any[]> {
+  const params = new URLSearchParams()
+  if (query.page) params.set('page', String(query.page))
+  if (query.limit) params.set('limit', String(query.limit))
+  const url = `${API_BASE_URL}${API_ENDPOINTS.sportsbookBetOpen}${
+    params.toString() ? '?' + params.toString() : ''
+  }`
+  const headers = await buildJsonRequestHeaders()
+  if (!headers.Authorization) return []
+  try {
+    const res = await fetch(url, { method: 'GET', headers })
+    const text = await res.text()
+    if (!res.ok) return []
+    const obj = text ? JSON.parse(text) : {}
+    const raw = obj?.data ?? obj
+    if (Array.isArray(raw)) return raw
+    if (Array.isArray(raw?.bets)) return raw.bets
+    if (Array.isArray(raw?.data)) return raw.data
+    if (Array.isArray(raw?.openBets)) return raw.openBets
+    return []
+  } catch {
+    return []
+  }
+}

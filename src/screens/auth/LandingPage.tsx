@@ -54,6 +54,14 @@ import SoccerIcon from '../../../assets/AppImages/soccer_icon.svg'
 import CasinoVector from '../../../assets/AppImages/casino_vector.svg'
 import SportVector from '../../../assets/AppImages/sport_vector.svg'
 import LinearGradient from 'react-native-linear-gradient'
+import CricketIconSvg from '../../../assets/AppImages/menu-icon19.svg'
+// import FootballPng from '../../../assets/AppImages/football.png'
+import TennisIconComponent from '../../../assets/AppImages/tennis_icon.svg'
+import BasketballIcon from '../../../assets/AppImages/basketball_icon.svg'
+import BaseballIcon from '../../../assets/AppImages/menu-icon2.svg'
+import HorseIcon from '../../../assets/AppImages/horse_icon.svg'
+import IceHockeyIcon from '../../../assets/AppImages/menu-icon10.svg'
+import FutsalIcon from '../../../assets/AppImages/menu-icon14.svg'
 import Video, {
   ResizeMode,
   PosterResizeModeType,
@@ -86,16 +94,16 @@ const heroSlides = [
   { id: 7, image: ImageAssets.homeBnr7Png, heading: 'Casino & Sports Hub', subContent: 'Bet Every Ball. Play Every Moment. Win Bigger.', navigateTo: 'Casino' },
 ]
 
-const topSportsItems = [
-  { id: 1, title: 'Cricket', icon: ImageAssets.menuIcon19Svg, to: 'InPlay' },
-  { id: 2, title: 'Football', icon: ImageAssets.football, to: 'InPlay' },
-  { id: 3, title: 'Tennis', icon: ImageAssets.tennisIconSvg, to: 'InPlay' },
-  { id: 4, title: 'Basketball', icon: ImageAssets.basketballIconSvg, to: 'SportsBook' },
-  { id: 5, title: 'Baseball', icon: ImageAssets.menuIcon2Svg, to: 'SportsBook' },
-  { id: 6, title: 'Horse Racing', icon: ImageAssets.horseIconSvg, to: 'SportsBook' },
-  { id: 7, title: 'Ice Hockey', icon: ImageAssets.menuIcon10Svg, to: 'SportsBook' },
-  { id: 8, title: 'Futsal', icon: ImageAssets.menuIcon14Svg, to: 'SportsBook' },
-]
+// const topSportsItems = [
+//   { id: 1, title: 'Cricket', icon: CricketIconSvg, to: 'InPlay' },
+//   { id: 2, title: 'Football', icon: FootballPng, to: 'InPlay' },
+//   { id: 3, title: 'Tennis', icon: TennisIconComponent, to: 'InPlay' },
+//   { id: 4, title: 'Basketball', icon: BasketballIcon, to: 'SportsBook' },
+//   { id: 5, title: 'Baseball', icon: BaseballIcon, to: 'SportsBook' },
+//   { id: 6, title: 'Horse Racing', icon: HorseIcon, to: 'SportsBook' },
+//   { id: 7, title: 'Ice Hockey', icon: IceHockeyIcon, to: 'SportsBook' },
+//   { id: 8, title: 'Futsal', icon: FutsalIcon, to: 'SportsBook' },
+// ]
 
 const trendingCategories = [
   { name: 'Aviator', image: ImageAssets.aviatorImgPng, video: ImageAssets.vidAviator },
@@ -392,6 +400,7 @@ const MatchTeamRow = memo(({ row, eventTime, leftClusterW, onPress }: { row: Spo
     prev.eventTime === next.eventTime &&
     prev.leftClusterW === next.leftClusterW;
 })
+console.log('sd')
 
 const MatchOddsRow = memo(({ row, stripCols, maxCols, rowKey, onPress }: { row: SportsbookMatch, stripCols: LandingOddsPairColumn[], maxCols: number, rowKey: string, onPress: () => void }) => {
   return (
@@ -400,12 +409,14 @@ const MatchOddsRow = memo(({ row, stripCols, maxCols, rowKey, onPress }: { row: 
       onPress={onPress}
     >
       <View style={styles.oddsStripRowHorizontal}>
-        {Array.from({ length: maxCols }, (_, i) => (
-          <OddsCell key={`b-${i}`} side="back" pair={stripCols[i] ?? null} />
-        ))}
-        {Array.from({ length: maxCols }, (_, i) => (
-          <OddsCell key={`l-${i}`} side="lay" pair={stripCols[i] ?? null} isLast={i === maxCols - 1} />
-        ))}
+        {Array.from({ length: maxCols }, (_, i) => {
+          console.log('back mapping i:', i);
+          return <OddsCell key={`b-${i}`} side="back" pair={stripCols[i] ?? null} />;
+        })}
+        {Array.from({ length: maxCols }, (_, i) => {
+          console.log('lay mapping i:', i);
+          return <OddsCell key={`l-${i}`} side="lay" pair={stripCols[i] ?? null} isLast={i === maxCols - 1} />;
+        })}
       </View>
     </Pressable>
   )
@@ -443,7 +454,7 @@ const MatchSection = memo(({ sportKey, navigation }: { sportKey: 'cricket' | 'te
     let mounted = true;
     const interval = setInterval(() => {
       if (!mounted) return;
-      
+
       let changed = false;
       if (pendingRawRef.current) {
         const defaults = sportKey === 'cricket' ? { tournament: 'Cricket' as const } : sportKey === 'tennis' ? { tournament: 'Tennis' as const } : { tournament: 'Football' as const };
@@ -505,18 +516,18 @@ const MatchSection = memo(({ sportKey, navigation }: { sportKey: 'cricket' | 'te
       .map((row, idx) => {
         const id = row.gameId ?? row.game_id ?? row.eventId ?? row.event_id ?? idx;
         const rowKey = `${sportKey}-${id}`;
-        
+
         // Use cached result if valid and row hasn't changed its odds payload reference
         const cached = oddsCacheRef.current[rowKey];
         if (cached && cached.stripCols && (row as any)._rawOdds === (row as any).matchOdds) {
-             // Logic to check if matchOdds are same ref - but matches are usually new objects from socket.
-             // We can do a shallow check of price/size instead.
+          // Logic to check if matchOdds are same ref - but matches are usually new objects from socket.
+          // We can do a shallow check of price/size instead.
         }
 
         const eventTime = row.eventTime ?? row.event_time ?? row.openDate ?? row.open_date;
         const oddsPayload = Array.isArray(row.matchOdds) && row.matchOdds.length > 0 ? { matchOdds: row.matchOdds as any[] } : null;
         const stripCols = getLandingOddsStripColumns({ ...row, teams: row.teams ?? row.eventName ?? row.name }, oddsPayload, LANDING_STRIP_MAX_COLS);
-        
+
         const result = { row, eventTime, stripCols, rowKey };
         nextOddsCache[rowKey] = { stripCols, eventTime };
         return result;
@@ -622,14 +633,14 @@ const HeroSlider = memo(({ onTouchStart, onTouchEnd, heroIndex, heroProgress, he
               offset === -1 ? styles.heroPosLeft1 : offset === 1 ? styles.heroPosRight1 : styles.heroPosCenter
               ]}>
                 <Pressable style={{ flex: 1 }} onPress={() => isCenter && onSlidePress(slide)}>
-                  <ImageBackground source={slide.image} style={styles.heroCardFill} imageStyle={styles.heroMainCardImage} resizeMode="cover">
+                  <FastImage source={slide.image} style={styles.heroCardFill} resizeMode={FastImage.resizeMode.cover}>
                     {isCenter && (
                       <View style={styles.heroMainCardOverlay}>
                         <Text style={styles.heroMainTitle}>{slide.heading}</Text>
                         <Text style={styles.heroMainSubtitle}>{slide.subContent}</Text>
                       </View>
                     )}
-                  </ImageBackground>
+                  </FastImage>
                 </Pressable>
               </Animated.View>
             );
@@ -777,21 +788,29 @@ const TopSportsSection = memo(({ navigation }: { navigation: any }) => {
         </TouchableOpacity>
       </View>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.topSportsList}>
-        {topSportsItems.map(item => (
-          <TouchableOpacity key={item.id} style={styles.topSportsItem} onPress={() => navigation.navigate(item.to)}>
-            <View style={styles.topSportsIconBox}>
-              <Image source={item.icon} style={styles.topSportsIcon} resizeMode="contain" />
-            </View>
-            <Text style={styles.topSportsItemTitle} numberOfLines={1}>{item.title}</Text>
-          </TouchableOpacity>
-        ))}
+        {/* {topSportsItems.map(item => {
+          const IconComp: any = item.icon;
+          const isSvg = typeof IconComp === 'function' || (typeof IconComp === 'object' && IconComp.$$typeof);
+          return (
+            <TouchableOpacity key={item.id} style={styles.topSportsItem} onPress={() => navigation.navigate(item.to)}>
+              <View style={styles.topSportsIconBox}>
+                {isSvg ? (
+                  <IconComp width={44} height={44} fill="#FFFFFF" />
+                ) : (
+                  <Image source={IconComp} style={[styles.topSportsIcon, { tintColor: '#FFFFFF' }]} resizeMode="contain" />
+                )}
+              </View>
+              <Text style={styles.topSportsItemTitle} numberOfLines={1}>{item.title}</Text>
+            </TouchableOpacity>
+          );
+        })} */}
       </ScrollView>
     </View>
   )
 })
 
 export const LandingPage = ({ onOpenLogin, onOpenSignup, onOpenHome, navigation: propsNav }: LandingPageProps) => {
-  const { isAuthenticated } = useAuth()
+  const { isAuthenticated, user } = useAuth()
   const navigation = useNavigation<any>()
   const finalNav = propsNav || navigation
 
@@ -889,7 +908,25 @@ export const LandingPage = ({ onOpenLogin, onOpenSignup, onOpenHome, navigation:
   useEffect(() => { const t = setInterval(() => runHeroSlide(1), 5000); return () => clearInterval(t); }, [runHeroSlide]);
 
   const handleLaunchGame = useCallback(async (game: any) => {
-    if (!isAuthenticated) { onOpenLogin ? onOpenLogin() : finalNav.navigate('Login'); return; }
+    if (!isAuthenticated) {
+      const gCode = (game.code || game.gameCode || '').toLowerCase();
+      if (gCode === 'aviator') {
+        finalNav.navigate('Casino', {
+          searchSelection: {
+            key: 'aviator',
+            provider: 'all',
+            category: 'Crash Type'
+          }
+        });
+      } else {
+        onOpenLogin ? onOpenLogin() : finalNav.navigate('Login');
+      }
+      return;
+    }
+    const isDemoUser = (user as any)?.role === 'demo' || (user as any)?.isDemo === true
+    if (isDemoUser) {
+      // Allow launch
+    }
     const targetCode = game.code || game.gameCode; if (!targetCode) return;
     setLaunchingGame(true);
     try {
@@ -941,6 +978,11 @@ export const LandingPage = ({ onOpenLogin, onOpenSignup, onOpenHome, navigation:
             {section.title !== 'Trending Games' && <LiveIcon width={20} height={20} />}
             <Text style={styles.sectionTitle}>{section.title}</Text>
           </View>
+          <TouchableOpacity onPress={() => finalNav.navigate('Casino')}>
+            <View style={styles.categoryGoBtn}>
+              <Text style={styles.categoryGoBtnText}>Go to {section.title}</Text>
+            </View>
+          </TouchableOpacity>
         </View>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.scrollContainer}>
           <View style={{ flexDirection: 'column' }}>
@@ -962,83 +1004,124 @@ export const LandingPage = ({ onOpenLogin, onOpenSignup, onOpenHome, navigation:
     );
   }, [handleLaunchGame]);
 
+  const listSections = useMemo(() => {
+    const list: any[] = []
+    if (!gamesLoading) {
+      list.push({
+        type: 'game-sections', data: [
+          { title: 'Trending Games', items: landingGames.trending },
+          { title: 'Roulette', items: landingGames.roulette },
+          { title: 'Card Games', items: landingGames.cardGames },
+          { title: 'Casino Lobby', items: casinoLobbyGames },
+          { title: 'Live Casino', items: landingGames.liveCasino },
+          { title: 'Slots', items: landingGames.slots },
+          { title: 'Chicken Road', items: chickenRoadResolved },
+          { title: 'Crash Games', items: crashGamesResolved },
+        ]
+      })
+      list.push({ type: 'top-sports' })
+    } else {
+      list.push({ type: 'games-loader' })
+    }
+
+    if (!matchesLoading) {
+      list.push({ type: 'match-section', sportKey: 'cricket' })
+      list.push({ type: 'match-section', sportKey: 'tennis' })
+      list.push({ type: 'match-section', sportKey: 'soccer' })
+    } else {
+      list.push({ type: 'matches-loader' })
+    }
+
+    return list
+  }, [gamesLoading, matchesLoading, landingGames, casinoLobbyGames, chickenRoadResolved, crashGamesResolved])
+
+  const renderPageItem = useCallback(({ item }: { item: any }) => {
+    switch (item.type) {
+      case 'game-sections':
+        return <>{item.data.map((s: any) => renderSection(s))}</>
+      case 'games-loader':
+        return <ActivityIndicator style={{ marginTop: 24 }} color={colors.accent} />
+      case 'matches-loader':
+        return (
+          <View style={styles.matchWrapper}>
+            <View style={styles.matchHeader}>
+              <View style={styles.matchHeaderLeft}>
+                <CricketIcon width={22} height={26} fill="#FFFFFF" />
+                <Text style={styles.matchTitle}>Cricket</Text>
+              </View>
+            </View>
+            <View style={{ paddingVertical: 40, alignItems: 'center', justifyContent: 'center' }}>
+              <ActivityIndicator color={colors.accent} size="large" />
+              <Text style={{ color: '#9CA3AF', marginTop: 12, fontSize: 15, fontFamily: AppFonts.montserratSemiBold }}>
+                Loading top matches...
+              </Text>
+            </View>
+          </View>
+        )
+      case 'match-section':
+        return <MatchSection sportKey={item.sportKey} navigation={finalNav} />
+      // case 'top-sports':
+      //   return <TopSportsSection navigation={finalNav} />
+      default:
+        return null
+    }
+  }, [renderSection, finalNav])
+
+  const ListHeader = useMemo(() => (
+    <View style={styles.mainContentArea}>
+      <LandingHeader
+        onLoginPress={onOpenLogin ?? (() => finalNav.navigate('Login'))}
+        onSignupPress={onOpenSignup ?? (() => finalNav.navigate('Login', { initialTab: 'signup' }))}
+        onSearchPress={() => finalNav.navigate('Search')}
+      />
+
+      <HeroSlider onTouchStart={e => setTouchStartX(e.nativeEvent.pageX)}
+        onTouchEnd={e => {
+          if (touchStartX === null) return;
+          const d = e.nativeEvent.pageX - touchStartX;
+          if (d < -40) runHeroSlide(1); else if (d > 40) runHeroSlide(-1);
+          setTouchStartX(null);
+        }}
+        heroIndex={heroIndex} heroProgress={heroProgress} heroDirection={heroDirection}
+        heroAnimating={heroAnimating} runHeroSlide={runHeroSlide} setHeroIndex={setHeroIndex}
+        onSlidePress={(slide) => {
+          if (slide.action === 'launchGame' && slide.gameData) {
+            handleLaunchGame(slide.gameData)
+          } else if (slide.navigateTo) {
+            finalNav.navigate(slide.navigateTo, slide.params)
+          }
+        }}
+      />
+
+      <QuickActions
+        isAuthenticated={isAuthenticated}
+        onOpenSignup={onOpenSignup ?? (() => finalNav.navigate('Login', { initialTab: 'signup' }))}
+        onOpenHome={onOpenHome ?? (() => finalNav.navigate('Login'))}
+        onOpenLogin={onOpenLogin ?? (() => finalNav.navigate('Login'))}
+        handleLaunchGame={handleLaunchGame}
+      />
+
+      <TopStrip markVideoFailed={name => setStripVideoFailed(p => new Set(p).add(name))} videoFailedSet={stripVideoFailed} />
+    </View>
+  ), [finalNav, onOpenLogin, onOpenSignup, touchStartX, runHeroSlide, heroIndex, heroProgress, heroDirection, heroAnimating, handleLaunchGame, isAuthenticated, onOpenHome, stripVideoFailed])
+
+  const ListFooter = useMemo(() => <LandingFooter />, [])
+
   return (
     <View style={styles.page}>
       {launchingGame && <View style={styles.globalLoader}><ActivityIndicator size="large" color="#F97316" /></View>}
-      <ScrollView showsVerticalScrollIndicator={false} style={styles.scroll}>
-        <View style={styles.mainContentArea}>
-          <LandingHeader
-            onLoginPress={onOpenLogin ?? (() => finalNav.navigate('Login'))}
-            onSignupPress={onOpenSignup ?? (() => finalNav.navigate('Login', { initialTab: 'signup' }))}
-            onSearchPress={() => finalNav.navigate('Search')}
-          />
-
-          <HeroSlider onTouchStart={e => setTouchStartX(e.nativeEvent.pageX)}
-            onTouchEnd={e => {
-              if (touchStartX === null) return;
-              const d = e.nativeEvent.pageX - touchStartX;
-              if (d < -40) runHeroSlide(1); else if (d > 40) runHeroSlide(-1);
-              setTouchStartX(null);
-            }}
-            heroIndex={heroIndex} heroProgress={heroProgress} heroDirection={heroDirection}
-            heroAnimating={heroAnimating} runHeroSlide={runHeroSlide} setHeroIndex={setHeroIndex}
-            onSlidePress={(slide) => {
-              if (slide.action === 'launchGame' && slide.gameData) {
-                handleLaunchGame(slide.gameData)
-              } else if (slide.navigateTo) {
-                finalNav.navigate(slide.navigateTo, slide.params)
-              }
-            }}
-          />
-
-          <QuickActions
-            isAuthenticated={isAuthenticated}
-            onOpenSignup={onOpenSignup ?? (() => finalNav.navigate('Login', { initialTab: 'signup' }))}
-            onOpenHome={onOpenHome ?? (() => finalNav.navigate('Login'))}
-            onOpenLogin={onOpenLogin ?? (() => finalNav.navigate('Login'))}
-            handleLaunchGame={handleLaunchGame}
-          />
-
-          <TopStrip markVideoFailed={name => setStripVideoFailed(p => new Set(p).add(name))} videoFailedSet={stripVideoFailed} />
-
-          <TopSportsSection navigation={finalNav} />
-
-          {gamesLoading ? <ActivityIndicator style={{ marginTop: 20 }} color={colors.accent} /> : [
-            { title: 'Trending Games', items: landingGames.trending },
-            { title: 'Roulette', items: landingGames.roulette },
-            { title: 'Card Games', items: landingGames.cardGames },
-            { title: 'Casino Lobby', items: casinoLobbyGames },
-            { title: 'Live Casino', items: landingGames.liveCasino },
-            { title: 'Slots', items: landingGames.slots },
-            { title: 'Chicken Road', items: chickenRoadResolved },
-            { title: 'Crash Games', items: crashGamesResolved },
-          ].map(s => renderSection(s))}
-
-          {matchesLoading ? (
-            <View style={styles.matchWrapper}>
-              <View style={styles.matchHeader}>
-                <View style={styles.matchHeaderLeft}>
-                  <CricketIcon width={22} height={26} fill="#FFFFFF" />
-                  <Text style={styles.matchTitle}>Cricket</Text>
-                </View>
-              </View>
-              <View style={{ paddingVertical: 40, alignItems: 'center', justifyContent: 'center' }}>
-                <ActivityIndicator color={colors.accent} size="large" />
-                <Text style={{ color: '#9CA3AF', marginTop: 12, fontSize: 15, fontFamily: AppFonts.montserratSemiBold }}>
-                  Loading top matches...
-                </Text>
-              </View>
-            </View>
-          ) : (
-            <>
-              <MatchSection sportKey="cricket" navigation={finalNav} />
-              <MatchSection sportKey="tennis" navigation={finalNav} />
-              <MatchSection sportKey="soccer" navigation={finalNav} />
-            </>
-          )}
-        </View>
-        <LandingFooter />
-      </ScrollView>
+      <FlatList
+        data={listSections}
+        keyExtractor={(item, index) => item.type + (item.sportKey || index)}
+        renderItem={renderPageItem}
+        ListHeaderComponent={ListHeader}
+        ListFooterComponent={ListFooter}
+        showsVerticalScrollIndicator={false}
+        initialNumToRender={4}
+        maxToRenderPerBatch={3}
+        windowSize={5}
+        removeClippedSubviews={Platform.OS === 'android'}
+      />
     </View>
   );
 }
@@ -1094,6 +1177,8 @@ const styles = StyleSheet.create({
   sectionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
   sectionTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   sectionTitle: { color: '#FFFFFF', fontSize: 16, fontFamily: AppFonts.montserratBold },
+  categoryGoBtn: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 6, },
+  categoryGoBtnText: { color: '#2383f6', fontSize: 11, fontFamily: AppFonts.montserratSemiBold },
   gameRow: { flexDirection: 'row', gap: 12 },
   scrollContainer: { paddingRight: 12 },
   gameCard: { width: 156, height: 112, borderRadius: 14, backgroundColor: '#1F2C47', justifyContent: 'center', alignItems: 'center', overflow: 'hidden' },
@@ -1119,7 +1204,7 @@ const styles = StyleSheet.create({
   },
   matchRow: {
     flexDirection: 'row', alignItems: 'stretch',
-    backgroundColor: colors.background, borderBottomWidth: 0.7,
+    backgroundColor: '#11161c', borderBottomWidth: 0.7,
     borderBottomColor: '#1c2f4a', width: '100%'
   },
   matchRowLeft: {
@@ -1131,8 +1216,14 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
     alignSelf: 'stretch', borderRightWidth: 0.8, borderRightColor: '#1c2f4a'
   },
-  liveTag: { color: '#FFF', backgroundColor: '#D4322E', fontSize: 9, fontFamily: AppFonts.montserratExtraBold, alignSelf: 'flex-start', paddingHorizontal: 5, paddingVertical: 2, borderRadius: 3, marginBottom: 6, overflow: 'hidden' },
-  liveTagStatic: { color: '#FFF', backgroundColor: '#D4322E', fontSize: 9, fontFamily: AppFonts.montserratExtraBold, alignSelf: 'flex-start', paddingHorizontal: 5, paddingVertical: 2, borderRadius: 3, marginTop: 4, overflow: 'hidden' },
+  liveTag: {
+    color: '#FFF', backgroundColor: '#D4322E', fontSize: 9, fontFamily: AppFonts.montserratExtraBold, alignSelf: 'flex-start',
+    paddingHorizontal: 5, paddingVertical: 2, borderRadius: 3, marginBottom: 6, overflow: 'hidden'
+  },
+  liveTagStatic: {
+    color: '#FFF', backgroundColor: '#D4322E', fontSize: 9, fontFamily: AppFonts.montserratExtraBold, alignSelf: 'flex-start',
+    paddingHorizontal: 5, paddingVertical: 2, borderRadius: 3, marginTop: 4, overflow: 'hidden'
+  },
   matchMetaDay: { color: '#9CA3AF', fontSize: 10, fontFamily: AppFonts.montserratRegular, marginBottom: 2 },
   matchMetaTime: { color: '#FFFFFF', fontSize: 10, fontFamily: AppFonts.montserratSemiBold },
   topSportsWrapper: { marginTop: 20, marginBottom: 10, paddingHorizontal: 12 },
@@ -1142,7 +1233,10 @@ const styles = StyleSheet.create({
   topSportsGoText: { color: '#FFF', fontSize: 12, fontFamily: AppFonts.montserratSemiBold },
   topSportsList: { paddingRight: 20 },
   topSportsItem: { width: 100, alignItems: 'center', marginRight: 15 },
-  topSportsIconBox: { width: 80, height: 80, backgroundColor: '#132238', borderRadius: 12, alignItems: 'center', justifyContent: 'center', marginBottom: 8, borderWidth: 1, borderColor: '#1c2f4a' },
+  topSportsIconBox: {
+    width: 80, height: 80, backgroundColor: '#132238', borderRadius: 12, alignItems: 'center', justifyContent: 'center', marginBottom: 8,
+    borderWidth: 1, borderColor: '#1c2f4a'
+  },
   topSportsIcon: { width: 44, height: 44 },
   topSportsItemTitle: { color: '#FFFFFF', fontSize: 13, fontFamily: AppFonts.montserratSemiBold, textAlign: 'center' },
   matchTeamsBox: { flex: 1, paddingVertical: 10, paddingHorizontal: 12, justifyContent: 'center' },

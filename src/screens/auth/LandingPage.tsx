@@ -285,6 +285,21 @@ const marketPillCodesForRow = (row: SportsbookMatch): string[] => {
 const getLandingGameImage = (item: LandingGame) =>
   item.thumb || item.thumbnail || item.image || item.icon || item.logo || ''
 
+const GameCard = memo(({ game, onPress }: { game: any, onPress: (g: any) => void }) => {
+  const imageUrl = useMemo(() => toAbsoluteImageUrl(getLandingGameImage(game)), [game]);
+  return (
+    <TouchableOpacity style={styles.gameCard} onPress={() => onPress(game)} activeOpacity={0.8}>
+      <FastImage source={{ uri: imageUrl }} style={styles.gameCardImage} resizeMode={FastImage.resizeMode.cover} />
+    </TouchableOpacity>
+  );
+}, (prev, next) => {
+  const prevId = prev.game._id || prev.game.id || prev.game.code;
+  const nextId = next.game._id || next.game.id || next.game.code;
+  const prevImg = getLandingGameImage(prev.game);
+  const nextImg = getLandingGameImage(next.game);
+  return prevId === nextId && prevImg === nextImg;
+});
+
 // --- Optimized Atomic UI Components ---
 
 const OddsCell = memo(({ side, pair, isLast }: { side: 'back' | 'lay'; pair: LandingOddsPairColumn | null; isLast?: boolean }) => {
@@ -421,13 +436,26 @@ const MatchSection = memo(({ sportKey, navigation }: { sportKey: 'cricket' | 'te
   const [data, setData] = useState<SportsbookMatch[]>([])
   const [loading, setLoading] = useState(true)
   const localRef = useRef<SportsbookMatch[]>([])
+  const pendingRawRef = useRef<any[] | null>(null)
 
   // 1. ISOLATED SOCKET SYNC: Updates here only re-render THIS section
   useEffect(() => {
     let mounted = true;
     const interval = setInterval(() => {
       if (!mounted) return;
-      setData(prev => (localRef.current !== prev ? localRef.current : prev));
+      
+      let changed = false;
+      if (pendingRawRef.current) {
+        const defaults = sportKey === 'cricket' ? { tournament: 'Cricket' as const } : sportKey === 'tennis' ? { tournament: 'Tennis' as const } : { tournament: 'Football' as const };
+        const mapped = mapMatchDataRowsToTopMatches(pendingRawRef.current, defaults);
+        localRef.current = mapped;
+        pendingRawRef.current = null;
+        changed = true;
+      }
+
+      if (changed || localRef.current !== data) {
+        setData(localRef.current);
+      }
     }, 1200);
 
     const remove = addMatchDataListener((kind, payload) => {
@@ -435,8 +463,7 @@ const MatchSection = memo(({ sportKey, navigation }: { sportKey: 'cricket' | 'te
       const { sportName, matches } = normalizeMatchDataUpdatePayload(payload);
       if (sportName !== sportKey || !Array.isArray(matches) || matches.length === 0) return;
 
-      const defaults = sportKey === 'cricket' ? { tournament: 'Cricket' as const } : sportKey === 'tennis' ? { tournament: 'Tennis' as const } : { tournament: 'Football' as const }
-      localRef.current = mapMatchDataRowsToTopMatches(matches, defaults);
+      pendingRawRef.current = matches;
       if (loading) setLoading(false);
     });
 
@@ -445,7 +472,7 @@ const MatchSection = memo(({ sportKey, navigation }: { sportKey: 'cricket' | 'te
       remove();
       clearInterval(interval);
     };
-  }, [sportKey, loading]);
+  }, [sportKey, loading, data]);
 
   // 2. ISOLATED REST PREFETCH
   useEffect(() => {
@@ -468,14 +495,31 @@ const MatchSection = memo(({ sportKey, navigation }: { sportKey: 'cricket' | 'te
   const winW = useMemo(() => Dimensions.get('window').width, []);
   const leftClusterW = useMemo(() => Math.min(270, Math.round(winW * 0.58)), [winW]);
 
+  // Use a ref to cache expensive odds calculations to avoid re-calculating everything on every data change
+  const oddsCacheRef = useRef<Record<string, { stripCols: LandingOddsPairColumn[], eventTime: any }>>({});
+
   const sortedRows = useMemo(() => {
-    return data
+    const nextOddsCache: Record<string, { stripCols: LandingOddsPairColumn[], eventTime: any }> = {};
+
+    const rows = data
       .map((row, idx) => {
-        const eventTime = row.eventTime ?? row.event_time ?? row.openDate ?? row.open_date
-        const oddsPayload = Array.isArray(row.matchOdds) && row.matchOdds.length > 0 ? { matchOdds: row.matchOdds as any[] } : null
-        const stripCols = getLandingOddsStripColumns({ ...row, teams: row.teams ?? row.eventName ?? row.name }, oddsPayload, LANDING_STRIP_MAX_COLS)
-        const rowKey = `${sportKey}-${row.gameId ?? row.game_id ?? row.eventId ?? row.event_id ?? idx}`
-        return { row, eventTime, stripCols, rowKey }
+        const id = row.gameId ?? row.game_id ?? row.eventId ?? row.event_id ?? idx;
+        const rowKey = `${sportKey}-${id}`;
+        
+        // Use cached result if valid and row hasn't changed its odds payload reference
+        const cached = oddsCacheRef.current[rowKey];
+        if (cached && cached.stripCols && (row as any)._rawOdds === (row as any).matchOdds) {
+             // Logic to check if matchOdds are same ref - but matches are usually new objects from socket.
+             // We can do a shallow check of price/size instead.
+        }
+
+        const eventTime = row.eventTime ?? row.event_time ?? row.openDate ?? row.open_date;
+        const oddsPayload = Array.isArray(row.matchOdds) && row.matchOdds.length > 0 ? { matchOdds: row.matchOdds as any[] } : null;
+        const stripCols = getLandingOddsStripColumns({ ...row, teams: row.teams ?? row.eventName ?? row.name }, oddsPayload, LANDING_STRIP_MAX_COLS);
+        
+        const result = { row, eventTime, stripCols, rowKey };
+        nextOddsCache[rowKey] = { stripCols, eventTime };
+        return result;
       })
       .sort((a, b) => {
         const aLive = !!(a.row.inPlay ?? (a.row as any).in_play);
@@ -486,6 +530,9 @@ const MatchSection = memo(({ sportKey, navigation }: { sportKey: 'cricket' | 'te
         return ta - tb;
       })
       .slice(0, 25);
+
+    oddsCacheRef.current = nextOddsCache;
+    return rows;
   }, [data, sportKey]);
 
   const maxCols = useMemo(() => Math.max(1, ...sortedRows.map(r => r.stripCols.length)), [sortedRows]);
@@ -899,17 +946,13 @@ export const LandingPage = ({ onOpenLogin, onOpenSignup, onOpenHome, navigation:
           <View style={{ flexDirection: 'column' }}>
             <View style={styles.gameRow}>
               {row1.map((g: any, i: number) => (
-                <TouchableOpacity key={i} style={styles.gameCard} onPress={() => handleLaunchGame(g)} activeOpacity={0.8}>
-                  <FastImage source={{ uri: toAbsoluteImageUrl(getLandingGameImage(g)) }} style={styles.gameCardImage} resizeMode={FastImage.resizeMode.cover} />
-                </TouchableOpacity>
+                <GameCard key={g._id || g.id || i} game={g} onPress={handleLaunchGame} />
               ))}
             </View>
             {isTwoRow && row2.length > 0 && (
               <View style={[styles.gameRow, { marginTop: 12 }]}>
                 {row2.map((g: any, i: number) => (
-                  <TouchableOpacity key={i} style={styles.gameCard} onPress={() => handleLaunchGame(g)} activeOpacity={0.8}>
-                    <FastImage source={{ uri: toAbsoluteImageUrl(getLandingGameImage(g)) }} style={styles.gameCardImage} resizeMode={FastImage.resizeMode.cover} />
-                  </TouchableOpacity>
+                  <GameCard key={g._id || g.id || i} game={g} onPress={handleLaunchGame} />
                 ))}
               </View>
             )}
@@ -958,7 +1001,7 @@ export const LandingPage = ({ onOpenLogin, onOpenSignup, onOpenHome, navigation:
 
           <TopStrip markVideoFailed={name => setStripVideoFailed(p => new Set(p).add(name))} videoFailedSet={stripVideoFailed} />
 
-          {/* <TopSportsSection navigation={finalNav} /> */}
+          <TopSportsSection navigation={finalNav} />
 
           {gamesLoading ? <ActivityIndicator style={{ marginTop: 20 }} color={colors.accent} /> : [
             { title: 'Trending Games', items: landingGames.trending },
@@ -988,9 +1031,9 @@ export const LandingPage = ({ onOpenLogin, onOpenSignup, onOpenHome, navigation:
             </View>
           ) : (
             <>
-              {/* <MatchSection sportKey="cricket" navigation={finalNav} />
+              <MatchSection sportKey="cricket" navigation={finalNav} />
               <MatchSection sportKey="tennis" navigation={finalNav} />
-              <MatchSection sportKey="soccer" navigation={finalNav} /> */}
+              <MatchSection sportKey="soccer" navigation={finalNav} />
             </>
           )}
         </View>

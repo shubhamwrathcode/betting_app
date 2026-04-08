@@ -47,11 +47,15 @@ const mergeProfileFromApi = (raw: any): ProfileBundle => {
   }
 }
 
-const rupeesInt = (v: unknown) =>
-  `₹${Number(v ?? 0).toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
+const rupeesInt = (v: unknown, isDemo?: boolean) => {
+  const val = isDemo ? 0 : Number(v ?? 0)
+  return `₹${val.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+}
 
-const rupeesDec = (v: unknown) =>
-  `₹${Number(v ?? 0).toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`
+const rupeesDec = (v: unknown, isDemo?: boolean) => {
+  const val = isDemo ? 0 : Number(v ?? 0)
+  return `₹${val.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+}
 
 const numIn = (v: unknown) => Number(v ?? 0).toLocaleString('en-IN')
 
@@ -161,6 +165,8 @@ const MyProfileScreen = () => {
     () => String(user?.fullName || user?.username || 'User').toUpperCase(),
     [user?.fullName, user?.username],
   )
+
+  const isDemo = useMemo(() => (user as any)?.role === 'demo' || (user as any)?.isDemo === true, [user])
 
   const avatarUri = profileImageUrl(user)
 
@@ -363,12 +369,12 @@ const MyProfileScreen = () => {
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Wallet & Stats</Text>
             <StatRow>
-              <StatCard label="Available Balance" value={rupeesInt(wallet?.balance)} />
-              <StatCard label="Bonus Balance" value={rupeesInt(wallet?.bonusBalance)} />
+              <StatCard label="Available Balance" value={rupeesInt(wallet?.balance, isDemo)} />
+              <StatCard label="Bonus Balance" value={rupeesInt(wallet?.bonusBalance, isDemo)} />
             </StatRow>
             <StatRow>
-              <StatCard label="Total Deposit" value={rupeesInt(wallet?.totalDeposited)} />
-              <StatCard label="Total Withdrawn" value={rupeesInt(wallet?.totalWithdrawn)} />
+              <StatCard label="Total Deposit" value={rupeesInt(wallet?.totalDeposited, isDemo)} />
+              <StatCard label="Total Withdrawn" value={rupeesInt(wallet?.totalWithdrawn, isDemo)} />
             </StatRow>
           </View>
 
@@ -377,7 +383,7 @@ const MyProfileScreen = () => {
             <StatRow>
               <StatCard
                 label="Total Wagered"
-                value={rupeesDec(stats?.totalWagered ?? bettingStats?.totalStake)}
+                value={rupeesDec(stats?.totalWagered ?? bettingStats?.totalStake, isDemo)}
               />
               <StatCard label="Total Bets" value={numIn(stats?.totalBets ?? bettingStats?.totalBets)} />
             </StatRow>
@@ -409,6 +415,8 @@ const MyProfileScreen = () => {
                         hour: 'numeric',
                         minute: '2-digit',
                         hour12: true,
+                        // dateStyle and timeStyle are not fully supported in all RN environments,
+                        // keeping the granular options but ensuring they are consistent.
                       })
                     : '—'
                 }

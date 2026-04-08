@@ -140,11 +140,11 @@ const ReferralRewardsScreen = () => {
     }
     const qs = query
       ? `?${new URLSearchParams(
-          Object.entries(query).reduce((acc, [k, v]) => {
-            if (v !== undefined && v !== null && String(v).trim() !== '') acc[k] = String(v)
-            return acc
-          }, {} as Record<string, string>),
-        ).toString()}`
+        Object.entries(query).reduce((acc, [k, v]) => {
+          if (v !== undefined && v !== null && String(v).trim() !== '') acc[k] = String(v)
+          return acc
+        }, {} as Record<string, string>),
+      ).toString()}`
       : ''
     const url = `${endpoint}${qs}`
     console.log('[ReferralRewards][API][GET][REQUEST]', { url, query })
@@ -328,15 +328,15 @@ const ReferralRewardsScreen = () => {
       setLoading(false)
       return
     }
-    ;(async () => {
+    ; (async () => {
       try {
         setLoading(true)
         await loadPlatformConfig()
         await Promise.allSettled([loadDashboard(), loadBalance(), loadProfit(1), loadRewardsHistory(1)])
       } catch (e: any) {
-      if (!sessionExpiredHandledRef.current) {
-        Toast.show({ type: 'error', text1: 'Error', text2: e?.message || 'Failed to load referral program.' })
-      }
+        if (!sessionExpiredHandledRef.current) {
+          Toast.show({ type: 'error', text1: 'Error', text2: e?.message || 'Failed to load referral program.' })
+        }
       } finally {
         setLoading(false)
       }
@@ -528,7 +528,7 @@ const ReferralRewardsScreen = () => {
           <Text style={styles.claimBtnText}>{isClaiming ? 'Claiming...' : 'Claim Now'}</Text>
         </Pressable>
       </View>
-
+      {/* 
       <View style={styles.applyCard}>
         <Text style={styles.sectionTitleSmall}>Apply Referral Code</Text>
         <View style={styles.applyRow}>
@@ -544,7 +544,7 @@ const ReferralRewardsScreen = () => {
             <Text style={styles.applyBtnText}>{isApplying ? 'Applying...' : 'Apply'}</Text>
           </Pressable>
         </View>
-      </View>
+      </View> */}
 
       <View style={styles.tableCard}>
         <View style={styles.tableHeader}>
@@ -636,7 +636,7 @@ const ReferralRewardsScreen = () => {
               <Text style={styles.filterBtnText}>Apply</Text>
             </Pressable>
             <Pressable style={[styles.exportBtn, styles.actionBtn, isExporting && styles.claimBtnDisabled]} onPress={handleExport} disabled={isExporting}>
-               <Image source={ImageAssets.download} tintColor={'#fff'} style={{width: 20, height: 20}}/>
+              <Image source={ImageAssets.download} tintColor={'#fff'} style={{ width: 20, height: 20 }} />
               <Text style={styles.exportBtnText}>{isExporting ? 'Exporting...' : 'CSV'}</Text>
             </Pressable>
           </View>
@@ -772,7 +772,7 @@ const styles = StyleSheet.create({
   searchInputWide: { borderRadius: 10, borderWidth: 1, borderColor: '#314157', backgroundColor: '#1a2433', color: '#fff', paddingHorizontal: 12, paddingVertical: 10, fontFamily: AppFonts.montserratMedium, fontSize: 14 },
   filterBtn: { backgroundColor: '#F97A31', paddingHorizontal: 18, paddingVertical: 10, borderRadius: 10 },
   filterBtnText: { color: '#fff', fontFamily: AppFonts.montserratBold, fontSize: 14 },
-  exportBtn: { backgroundColor: 'rgba(255,255,255,0.12)', paddingHorizontal: 14, paddingVertical: 10, borderRadius: 10,flexDirection:"row",justifyContent:"center",alignItems:"center",gap:10 },
+  exportBtn: { backgroundColor: 'rgba(255,255,255,0.12)', paddingHorizontal: 14, paddingVertical: 10, borderRadius: 10, flexDirection: "row", justifyContent: "center", alignItems: "center", gap: 10 },
   exportBtnText: { color: '#fff', fontFamily: AppFonts.montserratSemiBold, fontSize: 13 },
   tableHeadRow: { flexDirection: 'row', backgroundColor: '#0d1724', borderRadius: 8, borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)', paddingVertical: 12, paddingHorizontal: 8 },
   tableHeadRowRewards: { flexDirection: 'row', backgroundColor: '#0d1724', borderRadius: 8, borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)', paddingVertical: 12, paddingHorizontal: 6 },

@@ -27,7 +27,7 @@ import { useNavigation } from '@react-navigation/native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import Toast from 'react-native-toast-message'
 import { colors } from '../../theme/colors'
-import { API_BASE_URL } from '../../api/client'
+import { API_BASE_URL, apiClient } from '../../api/client'
 import { LandingGame, landingService } from '../../services/landingService'
 import { gameService } from '../../services/gameService'
 import { SportsbookMatch, sportsbookService } from '../../services/sportsbookService'
@@ -54,19 +54,9 @@ import SoccerIcon from '../../../assets/AppImages/soccer_icon.svg'
 import CasinoVector from '../../../assets/AppImages/casino_vector.svg'
 import SportVector from '../../../assets/AppImages/sport_vector.svg'
 import LinearGradient from 'react-native-linear-gradient'
-import CricketIconSvg from '../../../assets/AppImages/menu-icon19.svg'
-// import FootballPng from '../../../assets/AppImages/football.png'
-import TennisIconComponent from '../../../assets/AppImages/tennis_icon.svg'
-import BasketballIcon from '../../../assets/AppImages/basketball_icon.svg'
-import BaseballIcon from '../../../assets/AppImages/menu-icon2.svg'
-import HorseIcon from '../../../assets/AppImages/horse_icon.svg'
-import IceHockeyIcon from '../../../assets/AppImages/menu-icon10.svg'
-import FutsalIcon from '../../../assets/AppImages/menu-icon14.svg'
 import Video, {
   ResizeMode,
-  PosterResizeModeType,
-  IgnoreSilentSwitchType,
-  MixWithOthersType,
+
 } from 'react-native-video'
 import FastImage from 'react-native-fast-image'
 import { LandingFooter } from '../../components/common/LandingFooter'
@@ -75,6 +65,7 @@ import {
   getDayGroupIST,
   resolveEventTimeForIndiaDisplay,
 } from '../../utils/matchTimeIST'
+import { API_ENDPOINTS } from '../../api/endpoints'
 
 /** Types */
 export interface LandingPageProps {
@@ -661,12 +652,13 @@ const HeroSlider = memo(({ onTouchStart, onTouchEnd, heroIndex, heroProgress, he
   );
 });
 
-const QuickActions = memo(({ isAuthenticated, onOpenSignup, onOpenHome, onOpenLogin, handleLaunchGame }: {
+const QuickActions = memo(({ isAuthenticated, onOpenSignup, onOpenHome, onOpenLogin, handleLaunchGame, platformConfig }: {
   isAuthenticated: boolean,
   onOpenSignup?: () => void,
   onOpenHome?: () => void,
   onOpenLogin?: () => void,
-  handleLaunchGame: (game: any) => void
+  handleLaunchGame: (game: any) => void,
+  platformConfig: any
 }) => {
   const navigation = useNavigation<any>();
 
@@ -675,7 +667,24 @@ const QuickActions = memo(({ isAuthenticated, onOpenSignup, onOpenHome, onOpenLo
       <View style={[styles.heroOverlay, { paddingTop: 0 }]}>
         <View style={[styles.heroCtaRow, isAuthenticated && styles.heroCtaRowLoggedIn]}>
           {!isAuthenticated && <Pressable style={styles.signupBtn} onPress={onOpenSignup}><Text style={styles.signupBtnText}>Sign Up and Play</Text></Pressable>}
-          <Pressable style={styles.depositBtn} onPress={isAuthenticated ? onOpenHome : onOpenLogin}><Text style={styles.signupBtnText}>Deposit Now</Text></Pressable>
+          <Pressable
+            style={styles.depositBtn}
+            onPress={() => {
+              if (platformConfig && platformConfig.depositServiceStatus === false) {
+                Toast.show({ type: 'error', text1: 'Deposits are temporarily unavailable. Please try again later.' });
+                return;
+              }
+              if (isAuthenticated) {
+                if (onOpenHome) onOpenHome();
+                else navigation.navigate('Deposit');
+              } else {
+                if (onOpenLogin) onOpenLogin();
+                else navigation.navigate('Login');
+              }
+            }}
+          >
+            <Text style={styles.signupBtnText}>Deposit Now</Text>
+          </Pressable>
           <View style={styles.iconGroup}>
             {[
               { img: ImageAssets.spade, to: 'Casino' },
@@ -828,6 +837,7 @@ export const LandingPage = ({ onOpenLogin, onOpenSignup, onOpenHome, navigation:
     crashGames: LandingGame[];
   }>({ liveCasino: [], slots: [], trending: [], roulette: [], cardGames: [], chickenRoad: [], crashGames: [] })
   const [casinoLobbyGames, setCasinoLobbyGames] = useState<LandingGame[]>([])
+  const [platformConfig, setPlatformConfig] = useState<any>(null)
 
   const [ioChickenRoadGames, setIoChickenRoadGames] = useState<LandingGame[]>([])
   const [spbCrashGames, setSpbCrashGames] = useState<LandingGame[]>([])
@@ -865,6 +875,23 @@ export const LandingPage = ({ onOpenLogin, onOpenSignup, onOpenHome, navigation:
   }, [landingGames.crashGames, spbCrashGames, allCrashTypeGames])
   useEffect(() => {
     subscribeMatchDataLandingAll()
+    return () => { unsubscribeMatchDataLandingAll() }
+  }, [])
+
+  useEffect(() => {
+    let cancelled = false
+    const fetchConfig = async () => {
+      try {
+        const res = await apiClient<any>(API_ENDPOINTS.platformConfig, { method: 'GET' })
+        const data = res?.data?.data ?? res?.data
+        if (data && !cancelled) setPlatformConfig(data)
+      } catch (e) { }
+    }
+    fetchConfig()
+    return () => { cancelled = true }
+  }, [])
+
+  useEffect(() => {
     let mounted = true
     const load = async () => {
       try {
@@ -1096,9 +1123,10 @@ export const LandingPage = ({ onOpenLogin, onOpenSignup, onOpenHome, navigation:
       <QuickActions
         isAuthenticated={isAuthenticated}
         onOpenSignup={onOpenSignup ?? (() => finalNav.navigate('Login', { initialTab: 'signup' }))}
-        onOpenHome={onOpenHome ?? (() => finalNav.navigate('Login'))}
+        onOpenHome={onOpenHome ?? (() => finalNav.navigate('Deposit'))}
         onOpenLogin={onOpenLogin ?? (() => finalNav.navigate('Login'))}
         handleLaunchGame={handleLaunchGame}
+        platformConfig={platformConfig}
       />
 
       <TopStrip markVideoFailed={name => setStripVideoFailed(p => new Set(p).add(name))} videoFailedSet={stripVideoFailed} />

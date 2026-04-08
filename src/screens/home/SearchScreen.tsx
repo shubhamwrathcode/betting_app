@@ -12,10 +12,13 @@ import {
 } from 'react-native'
 import { useNavigation } from '@react-navigation/native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import Toast from 'react-native-toast-message'
 import { apiClient, API_BASE_URL } from '../../api/client'
 import { API_ENDPOINTS } from '../../api/endpoints'
 import { AppFonts } from '../../components/AppFonts'
 import { ImageAssets } from '../../components/ImageAssets'
+import { useAuth } from '../../hooks/useAuth'
+import { gameService } from '../../services/gameService'
 
 type SearchGame = {
   code?: string
@@ -103,6 +106,8 @@ const SearchScreen = () => {
   })
   const [trendingGames, setTrendingGames] = useState<SearchGame[]>([])
   const [trendingLoading, setTrendingLoading] = useState(false)
+  const [launchingGame, setLaunchingGame] = useState(false)
+  const { isAuthenticated } = useAuth()
 
   useEffect(() => {
     let mounted = true
@@ -152,18 +157,59 @@ const SearchScreen = () => {
 
   const hasSearchText = useMemo(() => query.trim().length >= SEARCH_MIN_CHARS, [query])
 
-  const applyGameFilterFromSearch = (game: SearchGame) => {
-    navigation.navigate('MainTabs', {
-      screen: 'Casino',
-      params: {
-        searchSelection: {
-          providerCode: getProviderCode(game) || 'all',
-          categoryCode: getGameCategoryCode(game) || 'lobby',
-          gameName: getGameName(game),
-          key: Date.now(),
+  const handleGamePress = async (game: SearchGame) => {
+    if (!isAuthenticated) {
+      Toast.show({
+        type: 'error',
+        text1: 'Authentication Required',
+        text2: 'Please login to play games',
+      })
+      navigation.navigate('Login', { initialTab: 'login' })
+      return
+    }
+
+    const gameCode = getGameCode(game)
+    const providerCode = getProviderCode(game)
+    if (!gameCode) {
+      // Fallback to filtering if no code
+      navigation.navigate('MainTabs', {
+        screen: 'Casino',
+        params: {
+          searchSelection: {
+            providerCode: providerCode || 'all',
+            categoryCode: getGameCategoryCode(game) || 'lobby',
+            gameName: getGameName(game),
+            key: Date.now(),
+          },
         },
-      },
-    })
+      })
+      return
+    }
+
+    setLaunchingGame(true)
+    try {
+      const res = await gameService.launchGame(gameCode, providerCode)
+      const d = res.data ?? (res as any).response?.data ?? (res as any).result ?? res
+      const launchURL =
+        d?.launchURL ||
+        d?.launchUrl ||
+        d?.url ||
+        d?.gameUrl ||
+        d?.gameURL ||
+        d?.iframeUrl ||
+        (typeof d === 'string' ? d : null)
+
+      if (!launchURL) throw new Error('Launch URL missing')
+      navigation.navigate('Game', { url: launchURL, title: getGameName(game) })
+    } catch {
+      Toast.show({
+        type: 'error',
+        text1: 'Launch Failed',
+        text2: 'Could not start the game',
+      })
+    } finally {
+      setLaunchingGame(false)
+    }
   }
 
   return (
@@ -187,6 +233,13 @@ const SearchScreen = () => {
           />
         </View>
       </View>
+
+      {launchingGame ? (
+        <View style={styles.globalLoader}>
+          <ActivityIndicator size="large" color="#F97316" />
+          <Text style={styles.loaderText}>Starting Game...</Text>
+        </View>
+      ) : null}
 
       <ScrollView
         showsVerticalScrollIndicator={false}
@@ -227,7 +280,7 @@ const SearchScreen = () => {
                 return (
                   <Pressable
                     style={styles.horizontalGameCard}
-                    onPress={() => applyGameFilterFromSearch(game)}
+                    onPress={() => handleGamePress(game)}
                   >
                     <View style={styles.horizontalImageContainer}>
                       <Image
@@ -281,7 +334,7 @@ const SearchScreen = () => {
                     return (
                       <Pressable
                         style={styles.horizontalGameCard}
-                        onPress={() => applyGameFilterFromSearch(game)}
+                        onPress={() => handleGamePress(game)}
                       >
                         <View style={styles.horizontalImageContainer}>
                           <Image
@@ -367,6 +420,19 @@ const styles = StyleSheet.create({
     backgroundColor: '#15233A',
   },
   matchName: { color: '#E6EEFC', fontFamily: AppFonts.montserratMedium, fontSize: 12 },
+  globalLoader: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(7, 18, 41, 0.95)',
+    zIndex: 9999,
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 12,
+  },
+  loaderText: {
+    color: '#FFF',
+    fontFamily: AppFonts.montserratSemiBold,
+    fontSize: 16,
+  },
 })
 
 export default SearchScreen

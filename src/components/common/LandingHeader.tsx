@@ -25,11 +25,13 @@ export const LandingHeader = ({
   const [profileOpen, setProfileOpen] = useState(false)
   const profileAnchorRef = useRef<View>(null)
   const [profileMenuRect, setProfileMenuRect] = useState({ top: 0, left: 0 })
-  const walletBalance = Number(user?.wallet?.balance ?? 0)
+  const isDemo = useMemo(() => (user as any)?.role === 'demo' || (user as any)?.isDemo === true, [user])
+  const walletBalance = isDemo ? 0 : Number(user?.wallet?.balance ?? 0)
   const walletLabel = `₹${walletBalance.toLocaleString('en-IN', {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   })}`
+
   const displayName = useMemo(() => {
     const fullName = String(user?.fullName ?? '').trim()
     if (fullName) return fullName.toUpperCase()
@@ -39,6 +41,7 @@ export const LandingHeader = ({
     if (mobile) return `USER ${mobile.slice(-4)}`
     return 'USER'
   }, [user?.fullName, user?.mobile, user?.username])
+
 
   const handleLogout = async () => {
     setProfileOpen(false)
@@ -108,26 +111,29 @@ export const LandingHeader = ({
       <>
         <View style={[styles.topBar, { paddingTop: insets.top + 8 }]}>
           <View style={styles.leftCluster}>
-            {/* {onBackPress ? (
-              <Pressable onPress={onBackPress} style={styles.backBtn} hitSlop={10} accessibilityRole="button">
-                <Text style={styles.backChevron}>‹</Text>
-              </Pressable>
-            ) : null} */}
             <Image source={ImageAssets.logoPng} style={styles.logoAuth} resizeMode="contain" />
           </View>
 
           <View style={styles.authActions}>
-            <View style={styles.walletChip}>
-             <Text>🇮🇳</Text>
-              <Text style={styles.walletText}>{walletLabel}</Text>
-            </View>
+            {isDemo ? (
+              <View style={styles.demoBadge}>
+                <Text style={styles.demoBadgeText}>Demo Mode</Text>
+              </View>
+            ) : (
+              <View style={styles.walletChip}>
+                <Text>🇮🇳</Text>
+                <Text style={styles.walletText}>{walletLabel}</Text>
+              </View>
+            )}
 
-            <Pressable
-              style={[styles.iconBtn, styles.plusBtn]}
-              onPress={() => navigation.navigate('Deposit', { returnToTab: getReturnTabName() })}
-            >
-              <Text style={styles.plusText}>+</Text>
-            </Pressable>
+            {!isDemo && (
+              <Pressable
+                style={[styles.iconBtn, styles.plusBtn]}
+                onPress={() => navigation.navigate('Deposit', { returnToTab: getReturnTabName() })}
+              >
+                <Text style={styles.plusText}>+</Text>
+              </Pressable>
+            )}
 
             <Pressable style={styles.iconBtn} onPress={onSearchPress}>
               <Image source={ImageAssets.search} style={{ width: 16, height: 16, tintColor: '#fff' }} resizeMode="contain" />
@@ -290,6 +296,19 @@ const styles = StyleSheet.create({
     color: '#EAF2FF',
     fontFamily: AppFonts.montserratMedium,
     fontSize: 13,
+  },
+  demoBadge: {
+    backgroundColor: '#334155',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+  },
+  demoBadgeText: {
+    color: '#CBD5E1',
+    fontFamily: AppFonts.montserratSemiBold,
+    fontSize: 12,
   },
   iconBtn: {
     width: 38,

@@ -1,7 +1,6 @@
 import React, { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ActivityIndicator,
-  Alert,
   Image,
   ImageBackground,
   Pressable,
@@ -1465,7 +1464,7 @@ const MatchDetailScreen = () => {
       return
     }
     if (!selectedBet?.placePayload) {
-      Alert.alert('Bet slip', 'Select a Back or Lay price first.')
+      Toast.show({ type: 'info', text1: 'Bet slip', text2: 'Select a Back or Lay price first.' })
       return
     }
     const stakeNum = Number(stake) || 0
@@ -1473,13 +1472,13 @@ const MatchDetailScreen = () => {
     if (stakeNum < minStake) {
       const msg = `Minimum stake is ₹${minStake}`
       setPlaceBetError(msg)
-      Alert.alert('Stake', msg)
+      Toast.show({ type: 'error', text1: 'Stake', text2: msg })
       return
     }
     if (stakeNum > maxStake) {
       const msg = `Maximum stake is ₹${maxStake}`
       setPlaceBetError(msg)
-      Alert.alert('Stake', msg)
+      Toast.show({ type: 'error', text1: 'Stake', text2: msg })
       return
     }
     setPlaceBetError(null)
@@ -1517,14 +1516,14 @@ const MatchDetailScreen = () => {
         throw new Error(failMsg || (res as { message?: string })?.message || 'Bet failed')
       }
       const successMsg = failMsg || (res as { message?: string })?.message || 'Bet placed successfully.'
-      Alert.alert('Success', successMsg)
+      Toast.show({ type: 'success', text1: 'Success', text2: successMsg })
       if (balanceAfter != null && Number.isFinite(balanceAfter)) {
         await updateUser({ wallet: { ...user?.wallet, balance: balanceAfter } })
       }
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : 'Bet failed'
       setPlaceBetError(msg)
-      Alert.alert('Bet failed', msg)
+      Toast.show({ type: 'error', text1: 'Bet failed', text2: msg })
     } finally {
       setPlaceBetLoading(false)
     }
@@ -1620,7 +1619,7 @@ const MatchDetailScreen = () => {
                 <Text style={styles.heroTitle}>{headerTitle}</Text>
                 {minMaxHero ? <Text style={styles.heroSub}>{minMaxHero}</Text> : null}
                 <View style={styles.streamingToggles}>
-                  {tvUrl && (
+                  {isCricket && tvUrl && (
                     <Pressable style={styles.streamBtn} onPress={() => setTvMode('tv')}>
                       <Text style={styles.streamBtnText}>📺 Live TV</Text>
                     </Pressable>

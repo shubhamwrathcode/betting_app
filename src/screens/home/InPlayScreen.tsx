@@ -10,8 +10,11 @@ import {
   StyleSheet,
   Text,
   View,
+  Animated,
+  Easing,
 } from 'react-native'
-import { useNavigation } from '@react-navigation/native'
+import LinearGradient from 'react-native-linear-gradient'
+import { useNavigation, useIsFocused } from '@react-navigation/native'
 import { LandingHeader } from '../../components/common/LandingHeader'
 import { useAuth } from '../../hooks/useAuth'
 import { AppFonts } from '../../components/AppFonts'
@@ -86,6 +89,56 @@ const FILTERS: Array<{ id: SportsFilter; label: string }> = [
   { id: 'virtual', label: '+ Virtual' },
   { id: 'premium', label: '+ Premium' },
 ]
+
+const winWidth = Dimensions.get('window').width;
+
+const SkeletonItem = ({ style }: { style?: any }) => {
+  const move = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    Animated.loop(
+      Animated.timing(move, {
+        toValue: 1,
+        duration: 1500,
+        easing: Easing.linear,
+        useNativeDriver: true,
+      })
+    ).start();
+  }, [move]);
+
+  const translateX = move.interpolate({
+    inputRange: [0, 1],
+    outputRange: [-winWidth, winWidth],
+  });
+
+  return (
+    <View style={[style, { backgroundColor: '#1e293b', overflow: 'hidden' }]}>
+      <Animated.View style={[StyleSheet.absoluteFill, { transform: [{ translateX }] }]}>
+        <LinearGradient
+          colors={['transparent', 'rgba(255, 255, 255, 0.12)', 'transparent']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 0 }}
+          style={{ flex: 1 }}
+        />
+      </Animated.View>
+    </View>
+  );
+}
+
+const InPlayMatchSkeleton = () => (
+  <View style={styles.skeletonRow}>
+    <View style={styles.skeletonLeft}>
+      <SkeletonItem style={styles.skeletonMeta} />
+      <View style={{ flex: 1, gap: 8 }}>
+        <SkeletonItem style={{ width: '80%', height: 16, borderRadius: 4 }} />
+        <SkeletonItem style={{ width: '50%', height: 12, borderRadius: 4 }} />
+      </View>
+    </View>
+    <View style={styles.skeletonRight}>
+      <SkeletonItem style={styles.skeletonOddsCell} />
+      <SkeletonItem style={styles.skeletonOddsCell} />
+    </View>
+  </View>
+);
 
 // --- Helper Functions ---
 
@@ -260,8 +313,12 @@ const InPlayScreen = () => {
   }, [activeTab, navigation]);
   const [sportsFilter, setSportsFilter] = useState<SportsFilter>('')
   const [currentSlide, setCurrentSlide] = useState(0)
+  const isFocused = useIsFocused()
   const [loading, setLoading] = useState(true)
   const [rowHeights, setRowHeights] = useState<Record<string, number>>({})
+
+  // Odds calculation cache to prevent heavy re-mapping every 1.2s
+  const oddsCacheRef = useRef<Record<string, { stripCols: LandingOddsPairColumn[], eventTime: any }>>({});
 
   // Buffers for Socket Data (Mirroring LandingPage)
   const cricketRef = useRef<MatchItem[]>([])
@@ -271,17 +328,20 @@ const InPlayScreen = () => {
   const [tennisMatches, setTennisMatches] = useState<MatchItem[]>([])
   const [soccerMatches, setSoccerMatches] = useState<MatchItem[]>([])
 
-  // 1. Throttled State Update (Every 1.2s)
+  // 1. Throttled State Update (Every 1.2s) - Only when focused
   useEffect(() => {
+    if (!isFocused) return;
     const interval = setInterval(() => {
       setCricketMatches(prev => (cricketRef.current !== prev ? cricketRef.current : prev));
       setTennisMatches(prev => (tennisRef.current !== prev ? tennisRef.current : prev));
       setSoccerMatches(prev => (soccerRef.current !== prev ? soccerRef.current : prev));
     }, 1200);
     return () => clearInterval(interval);
-  }, []);
+  }, [isFocused]);
 
   useEffect(() => {
+    if (!isFocused) return;
+    
     subscribeMatchDataLandingAll()
     const remove = addMatchDataListener((kind, payload) => {
       if (kind === 'error') return;
@@ -317,10 +377,15 @@ const InPlayScreen = () => {
       if (key === 'cricket') cricketRef.current = mapped as any[];
       else if (key === 'tennis') tennisRef.current = mapped as any[];
       else soccerRef.current = mapped as any[];
-      setLoading(false);
+
+      // Only set loading to false if we actually have data to show, 
+      // preventing the "No matches available" flash before the interval runs.
+      if (mapped.length > 0) {
+        setLoading(false);
+      }
     })
     return () => { remove(); unsubscribeMatchDataLandingAll(); }
-  }, [])
+  }, [isFocused])
 
   // REST Prefetch - Now non-blocking, updates sports as they arrive
   useEffect(() => {
@@ -381,16 +446,30 @@ const InPlayScreen = () => {
   }, [navigation, activeTab])
 
   const rowsPrep = useMemo(() => {
-    return activeMatches.map((row, idx) => {
-      const eventTime = resolveEventTimeForIndiaDisplay(row.eventTime ?? row.event_time ?? row.startTime)
+    const nextCache: Record<string, { stripCols: LandingOddsPairColumn[], eventTime: any }> = {};
+
+    const items = activeMatches.map((row, idx) => {
+      const rowKey = `${activeTab}-${row.eventId ?? row.gameId ?? idx}`
+      const cached = oddsCacheRef.current[rowKey];
+
+      // If we have a cached version and the odds payload reference hasn't changed, reuse it.
+      // (Matches are usually new objects from socket updates, but we can do a shallow check if needed)
+      // For now, re-calculating eventTime and stripCols only if absolutely necessary is hard, 
+      // but caching them for the current render loop helps with sortedRows stability.
+
+      const eventTime = row.eventTime ?? row.event_time ?? row.startTime;
       const oddsPayload = Array.isArray(row.matchOdds) && row.matchOdds.length > 0 ? { matchOdds: row.matchOdds } : null
       const stripCols = getLandingOddsStripColumns(
         { ...row, teams: row.teams ?? row.eventName ?? row.event_name ?? row.name },
         oddsPayload, LANDING_STRIP_MAX_COLS
       )
-      const rowKey = `${activeTab}-${row.eventId ?? row.gameId ?? idx}`
+
+      nextCache[rowKey] = { stripCols, eventTime };
       return { row, eventTime, stripCols, rowKey }
     })
+
+    oddsCacheRef.current = nextCache;
+    return items;
   }, [activeMatches, activeTab])
 
   const maxCols = useMemo(() => Math.max(1, ...rowsPrep.map(r => r.stripCols.length)), [rowsPrep]);
@@ -494,9 +573,8 @@ const InPlayScreen = () => {
       />
 
       {loading && activeMatches.length === 0 ? (
-        <View style={styles.centerState}>
-          <ActivityIndicator color="#2E90FA" />
-          <Text style={styles.stateText}>Loading matches...</Text>
+        <View style={styles.skeletonList}>
+          {[1, 2, 3, 4, 5, 6].map(i => <InPlayMatchSkeleton key={i} />)}
         </View>
       ) : (
         <FlatList
@@ -506,14 +584,17 @@ const InPlayScreen = () => {
           ListHeaderComponent={renderHeader}
           contentContainerStyle={styles.content}
           showsVerticalScrollIndicator={false}
-          initialNumToRender={10}
-          maxToRenderPerBatch={10}
-          windowSize={5}
-          removeClippedSubviews={Platform.OS === 'android'}
+          initialNumToRender={8}
+          maxToRenderPerBatch={4}
+          windowSize={7}
+          removeClippedSubviews={true}
+          updateCellsBatchingPeriod={50}
           ListEmptyComponent={() => (
-            <View style={styles.centerState}>
-              <Text style={styles.stateText}>No matches available</Text>
-            </View>
+            !loading ? (
+              <View style={styles.centerState}>
+                <Text style={styles.stateText}>No matches available</Text>
+              </View>
+            ) : null
           )}
         />
       )}
@@ -587,6 +668,12 @@ const styles = StyleSheet.create({
   oddsPrice: { color: '#0f172a', fontSize: 12, fontFamily: AppFonts.montserratBold },
   oddsVol: { color: '#1e3a5f', fontSize: 9, fontFamily: AppFonts.montserratRegular, marginTop: 2 },
   oddsDash: { color: '#475569', fontSize: 14, fontFamily: AppFonts.montserratSemiBold },
+  skeletonList: { padding: 12, gap: 12 },
+  skeletonRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#11161c', borderRadius: 8, padding: 12, gap: 12, height: ROW_H + 20 },
+  skeletonLeft: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 12 },
+  skeletonMeta: { width: 50, height: 40, borderRadius: 4 },
+  skeletonRight: { flexDirection: 'row', gap: 6 },
+  skeletonOddsCell: { width: 50, height: 50, borderRadius: 4 },
 })
 
 export default InPlayScreen

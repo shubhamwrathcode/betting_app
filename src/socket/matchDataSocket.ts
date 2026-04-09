@@ -9,7 +9,7 @@ import { API_BASE_URL } from '../api/client'
 const NAMESPACE_SUFFIX = '/matchdata'
 const DISCONNECT_MATCH_DATA_WHEN_IDLE = false
 
-export const LANDING_MATCH_DATA_SPORTS = ['cricket', 'tennis', 'soccer'] as const
+export const LANDING_MATCH_DATA_SPORTS = ['cricket', 'tennis', 'soccer', 'football'] as const
 
 function getMatchDataSocketOrigin(): string {
   const raw = String(API_BASE_URL || '').trim()

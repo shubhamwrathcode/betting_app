@@ -463,10 +463,17 @@ const MatchSection = memo(({ sportKey, navigation }: { sportKey: 'cricket' | 'te
     const remove = addMatchDataListener((kind, payload) => {
       if (kind === 'error') return;
       const { sportName, matches } = normalizeMatchDataUpdatePayload(payload);
-      if (sportName !== sportKey || !Array.isArray(matches) || matches.length === 0) return;
+      const key = sportName === 'football' ? 'soccer' : sportName;
+      if (key !== sportKey || !Array.isArray(matches) || matches.length === 0) return;
 
       pendingRawRef.current = matches;
-      if (loading) setLoading(false);
+      if (loading) {
+        setLoading(false);
+        const defaults = sportKey === 'cricket' ? { tournament: 'Cricket' as const } : sportKey === 'tennis' ? { tournament: 'Tennis' as const } : { tournament: 'Football' as const };
+        const mapped = mapMatchDataRowsToTopMatches(matches, defaults);
+        localRef.current = mapped;
+        setData(mapped);
+      }
     });
 
     return () => {
@@ -1034,19 +1041,15 @@ export const LandingPage = ({ onOpenLogin, onOpenSignup, onOpenHome, navigation:
   const listSections = useMemo(() => {
     const list: any[] = []
     if (!gamesLoading) {
-      list.push({
-        type: 'game-sections', data: [
-          { title: 'Trending Games', items: landingGames.trending },
-          { title: 'Roulette', items: landingGames.roulette },
-          { title: 'Card Games', items: landingGames.cardGames },
-          { title: 'Casino Lobby', items: casinoLobbyGames },
-          { title: 'Live Casino', items: landingGames.liveCasino },
-          { title: 'Slots', items: landingGames.slots },
-          { title: 'Chicken Road', items: chickenRoadResolved },
-          { title: 'Crash Games', items: crashGamesResolved },
-        ]
-      })
-      list.push({ type: 'top-sports' })
+      list.push({ type: 'game-section', title: 'Trending Games', items: landingGames.trending });
+      list.push({ type: 'game-section', title: 'Roulette', items: landingGames.roulette });
+      list.push({ type: 'game-section', title: 'Card Games', items: landingGames.cardGames });
+      list.push({ type: 'game-section', title: 'Casino Lobby', items: casinoLobbyGames });
+      list.push({ type: 'game-section', title: 'Live Casino', items: landingGames.liveCasino });
+      list.push({ type: 'game-section', title: 'Slots', items: landingGames.slots });
+      list.push({ type: 'game-section', title: 'Chicken Road', items: chickenRoadResolved });
+      list.push({ type: 'game-section', title: 'Crash Games', items: crashGamesResolved });
+      list.push({ type: 'top-sports' });
     } else {
       list.push({ type: 'games-loader' })
     }
@@ -1064,8 +1067,8 @@ export const LandingPage = ({ onOpenLogin, onOpenSignup, onOpenHome, navigation:
 
   const renderPageItem = useCallback(({ item }: { item: any }) => {
     switch (item.type) {
-      case 'game-sections':
-        return <>{item.data.map((s: any) => renderSection(s))}</>
+      case 'game-section':
+        return renderSection(item)
       case 'games-loader':
         return <ActivityIndicator style={{ marginTop: 24 }} color={colors.accent} />
       case 'matches-loader':
@@ -1129,7 +1132,7 @@ export const LandingPage = ({ onOpenLogin, onOpenSignup, onOpenHome, navigation:
         platformConfig={platformConfig}
       />
 
-      <TopStrip markVideoFailed={name => setStripVideoFailed(p => new Set(p).add(name))} videoFailedSet={stripVideoFailed} />
+      {/* <TopStrip markVideoFailed={name => setStripVideoFailed(p => new Set(p).add(name))} videoFailedSet={stripVideoFailed} /> */}
     </View>
   ), [finalNav, onOpenLogin, onOpenSignup, touchStartX, runHeroSlide, heroIndex, heroProgress, heroDirection, heroAnimating, handleLaunchGame, isAuthenticated, onOpenHome, stripVideoFailed])
 
@@ -1145,9 +1148,9 @@ export const LandingPage = ({ onOpenLogin, onOpenSignup, onOpenHome, navigation:
         ListHeaderComponent={ListHeader}
         ListFooterComponent={ListFooter}
         showsVerticalScrollIndicator={false}
-        initialNumToRender={4}
-        maxToRenderPerBatch={3}
-        windowSize={5}
+        initialNumToRender={15}
+        maxToRenderPerBatch={10}
+        windowSize={11}
         removeClippedSubviews={Platform.OS === 'android'}
       />
     </View>

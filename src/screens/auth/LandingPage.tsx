@@ -186,6 +186,84 @@ const mergeDedupeGames = (...lists: LandingGame[][]): LandingGame[] => {
   return out
 }
 
+const winW = Dimensions.get('window').width;
+
+const SkeletonItem = ({ style }: { style?: any }) => {
+  const move = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    Animated.loop(
+      Animated.timing(move, {
+        toValue: 1,
+        duration: 1500,
+        easing: Easing.linear,
+        useNativeDriver: true,
+      })
+    ).start();
+  }, [move]);
+
+  const translateX = move.interpolate({
+    inputRange: [0, 1],
+    outputRange: [-winW, winW],
+  });
+
+  return (
+    <View style={[style, { backgroundColor: '#1e293b', overflow: 'hidden' }]}>
+      <Animated.View style={[StyleSheet.absoluteFill, { transform: [{ translateX }] }]}>
+        <LinearGradient
+          colors={['transparent', 'rgba(255, 255, 255, 0.12)', 'transparent']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 0 }}
+          style={{ flex: 1 }}
+        />
+      </Animated.View>
+    </View>
+  );
+}
+
+
+const GameSkeletonRow = () => (
+  <View style={styles.sectionWrap}>
+    <SkeletonItem style={{ width: 140, height: 20, borderRadius: 4, marginBottom: 16 }} />
+    <View style={styles.gameRow}>
+      {[1, 2, 3].map(i => (
+        <SkeletonItem key={i} style={[styles.gameCard, { backgroundColor: '#1e293b' }]} />
+      ))}
+    </View>
+  </View>
+);
+
+const MatchSectionSkeleton = ({ title, icon }: { title: string, icon: any }) => {
+  const Icon = icon;
+  return (
+    <View style={styles.matchWrapper}>
+      <View style={styles.matchHeader}>
+        <View style={styles.matchHeaderLeft}>
+          <Icon width={22} height={26} fill="#64748b" />
+          <Text style={[styles.matchTitle, { color: '#64748b' }]}>{title}</Text>
+        </View>
+      </View>
+      <View style={styles.matchSectionSkeletonList}>
+        {[1, 2, 3].map(i => (
+          <View key={i} style={styles.matchSkeletonRow}>
+            <View style={styles.matchSkeletonLeft}>
+              <SkeletonItem style={{ width: 60, height: 40, borderRadius: 4 }} />
+              <View style={{ flex: 1, gap: 8 }}>
+                <SkeletonItem style={{ width: '80%', height: 16, borderRadius: 4 }} />
+                <SkeletonItem style={{ width: '50%', height: 12, borderRadius: 4 }} />
+              </View>
+            </View>
+            <View style={styles.matchSkeletonRight}>
+              <SkeletonItem style={{ width: 50, height: 50, borderRadius: 4 }} />
+              <SkeletonItem style={{ width: 50, height: 50, borderRadius: 4 }} />
+            </View>
+          </View>
+        ))}
+      </View>
+    </View>
+  );
+};
+
+
 // --- Removed local time formatters in favor of matchTimeIST ---
 
 const mapMatchDataRowsToTopMatches = (matches: any[], defaults: { tournament: string }): SportsbookMatch[] => {
@@ -558,19 +636,7 @@ const MatchSection = memo(({ sportKey, navigation }: { sportKey: 'cricket' | 'te
   }, [navigation, sportKey]);
 
   if (loading && data.length === 0) {
-    return (
-      <View style={styles.matchWrapper}>
-        <View style={styles.matchHeader}>
-          <View style={styles.matchHeaderLeft}>
-            <Icon width={22} height={26} fill="#FFFFFF" />
-            <Text style={styles.matchTitle}>{displayName}</Text>
-          </View>
-        </View>
-        <View style={{ height: 100, justifyContent: 'center', alignItems: 'center' }}>
-          <ActivityIndicator color={colors.accent} size="small" />
-        </View>
-      </View>
-    );
+    return <MatchSectionSkeleton title={displayName} icon={Icon} />;
   }
 
   return (
@@ -1070,23 +1136,14 @@ export const LandingPage = ({ onOpenLogin, onOpenSignup, onOpenHome, navigation:
       case 'game-section':
         return renderSection(item)
       case 'games-loader':
-        return <ActivityIndicator style={{ marginTop: 24 }} color={colors.accent} />
+        return <><GameSkeletonRow /><GameSkeletonRow /></>
       case 'matches-loader':
         return (
-          <View style={styles.matchWrapper}>
-            <View style={styles.matchHeader}>
-              <View style={styles.matchHeaderLeft}>
-                <CricketIcon width={22} height={26} fill="#FFFFFF" />
-                <Text style={styles.matchTitle}>Cricket</Text>
-              </View>
-            </View>
-            <View style={{ paddingVertical: 40, alignItems: 'center', justifyContent: 'center' }}>
-              <ActivityIndicator color={colors.accent} size="large" />
-              <Text style={{ color: '#9CA3AF', marginTop: 12, fontSize: 15, fontFamily: AppFonts.montserratSemiBold }}>
-                Loading top matches...
-              </Text>
-            </View>
-          </View>
+          <>
+            <MatchSectionSkeleton title="Cricket" icon={CricketIcon} />
+            <MatchSectionSkeleton title="Tennis" icon={TennisIcon} />
+            <MatchSectionSkeleton title="Football" icon={SoccerIcon} />
+          </>
         )
       case 'match-section':
         return <MatchSection sportKey={item.sportKey} navigation={finalNav} />
@@ -1283,4 +1340,8 @@ const styles = StyleSheet.create({
   oddsStripPrice: { color: '#111827', fontSize: 13, fontFamily: AppFonts.montserratBold },
   oddsStripVol: { color: '#374151', fontSize: 9, fontFamily: AppFonts.montserratRegular },
   oddsDash: { color: '#9CA3AF', fontSize: 15 },
+  matchSectionSkeletonList: { backgroundColor: '#11161c', borderRadius: 12, overflow: 'hidden', padding: 12, gap: 12 },
+  matchSkeletonRow: { flexDirection: 'row', alignItems: 'center', gap: 12, borderBottomWidth: 1, borderBottomColor: '#1e293b', paddingBottom: 12 },
+  matchSkeletonLeft: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10 },
+  matchSkeletonRight: { flexDirection: 'row', gap: 6 },
 })

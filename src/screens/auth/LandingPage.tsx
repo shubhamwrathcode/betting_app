@@ -479,11 +479,9 @@ const MatchOddsRow = memo(({ row, stripCols, maxCols, rowKey, onPress }: { row: 
     >
       <View style={styles.oddsStripRowHorizontal}>
         {Array.from({ length: maxCols }, (_, i) => {
-          console.log('back mapping i:', i);
           return <OddsCell key={`b-${i}`} side="back" pair={stripCols[i] ?? null} />;
         })}
         {Array.from({ length: maxCols }, (_, i) => {
-          console.log('lay mapping i:', i);
           return <OddsCell key={`l-${i}`} side="lay" pair={stripCols[i] ?? null} isLast={i === maxCols - 1} />;
         })}
       </View>

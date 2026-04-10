@@ -1,15 +1,20 @@
-import React, { createContext, PropsWithChildren, useMemo, useState, useEffect } from 'react'
+import React, { createContext, PropsWithChildren, useMemo, useState, useEffect, useCallback } from 'react'
 import AsyncStorage from '@react-native-async-storage/async-storage'
+import Toast from 'react-native-toast-message'
 import { setMemoryToken } from '../api/client'
+import { reset as resetNavigation } from '../navigation/navigationRef'
 
 type UserData = {
   _id?: string
+  id?: string // Some APIs use id, others _id
   username?: string
   mobile?: string
   fullName?: string
   email?: string
   profileImage?: string
   updatedAt?: string
+  isDemo?: boolean
+  expiresAt?: string
   wallet?: {
     balance: number
   }
@@ -55,6 +60,55 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
     hydrate()
   }, [])
 
+  const handleLogout = useCallback(async () => {
+    try {
+      // CLEAR EVERYTHING
+      setMemoryToken(null)
+      await AsyncStorage.removeItem('user_auth')
+      setUser(null)
+      setAuthenticated(false)
+      
+      // RESET NAVIGATION IMMEDIATELY to clear any open games/modals
+      resetNavigation('MainTabs')
+    } catch (err) {
+      console.warn('Storage cleanup failed')
+    }
+  }, [])
+
+  // Timer for demo session expiration
+  useEffect(() => {
+    let timer: any = null;
+    
+    // STRICTLY for demo login users only
+    if (isAuthenticated && user?.isDemo === true && user?.expiresAt) {
+      const expirationTime = new Date(user.expiresAt).getTime();
+      const currentTime = new Date().getTime();
+      const timeLeft = expirationTime - currentTime;
+      
+      console.log(`[Auth] Demo session expires at: ${user.expiresAt}. Time remaining: ${Math.round(timeLeft/1000)}s`);
+
+      if (timeLeft <= 0) {
+        console.log('[Auth] Demo session already expired, logging out…');
+        handleLogout();
+      } else {
+        // Set a timer to logout exactly when it expires
+        timer = setTimeout(() => {
+          console.log('[Auth] Demo session expired, logging out automatically…');
+          Toast.show({
+            type: 'info',
+            text1: 'Demo Expired',
+            text2: 'Session expired. Please log in again.'
+          });
+          handleLogout();
+        }, timeLeft);
+      }
+    }
+
+    return () => {
+      if (timer) clearTimeout(timer);
+    };
+  }, [isAuthenticated, user?.expiresAt, user?.isDemo, handleLogout]);
+
   const value = useMemo(
     () => ({
       isAuthenticated,
@@ -74,16 +128,7 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
           console.warn('Persistence failed (Rebuild required). Session will only last until app restart.')
         }
       },
-      logout: async () => {
-        try {
-          setMemoryToken(null)
-          await AsyncStorage.removeItem('user_auth')
-          setUser(null)
-          setAuthenticated(false)
-        } catch (err) {
-          console.warn('Storage cleanup failed')
-        }
-      },
+      logout: handleLogout,
       updateUser: async (partial: Partial<UserData>) => {
         try {
           const stored = await AsyncStorage.getItem('user_auth')

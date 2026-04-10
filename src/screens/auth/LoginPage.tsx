@@ -182,6 +182,11 @@ export const LoginPage = ({ navigation, route }: LoginPageProps) => {
     setLoading(true)
     try {
       const res = await authService.demoLogin()
+      try {
+        console.log('[DemoLogin] raw response:', JSON.stringify(res, null, 2))
+      } catch {
+        console.log('[DemoLogin] raw response (non-serializable):', res)
+      }
       if (res.status === 'success' || res.success) {
         Toast.show({
           type: 'success',
@@ -201,6 +206,12 @@ export const LoginPage = ({ navigation, route }: LoginPageProps) => {
         })
       }
     } catch (err) {
+      console.log('[DemoLogin] catch error:', err)
+      if (err && typeof err === 'object' && 'response' in err) {
+        const ax = err as { response?: { status?: number; data?: unknown } }
+        console.log('[DemoLogin] response status:', ax.response?.status)
+        console.log('[DemoLogin] response data:', ax.response?.data)
+      }
       Toast.show({ type: 'error', text1: 'Error', text2: 'Demo login failed' })
     }
     setLoading(false)

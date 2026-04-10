@@ -304,6 +304,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.1)',
+    right:10
   },
   demoBadgeText: {
     color: '#CBD5E1',

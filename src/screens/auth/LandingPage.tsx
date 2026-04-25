@@ -469,7 +469,6 @@ const MatchTeamRow = memo(({ row, eventTime, leftClusterW, onPress }: { row: Spo
     prev.eventTime === next.eventTime &&
     prev.leftClusterW === next.leftClusterW;
 })
-console.log('sd')
 
 const MatchOddsRow = memo(({ row, stripCols, maxCols, rowKey, onPress }: { row: SportsbookMatch, stripCols: LandingOddsPairColumn[], maxCols: number, rowKey: string, onPress: () => void }) => {
   return (
@@ -515,67 +514,68 @@ const MatchSection = memo(({ sportKey, navigation }: { sportKey: 'cricket' | 'te
   const [loading, setLoading] = useState(true)
   const localRef = useRef<SportsbookMatch[]>([])
   const pendingRawRef = useRef<any[] | null>(null)
+  /** Mirrors `loading` for socket listener without re-subscribing when it flips */
+  const loadingRef = useRef(true)
 
-  // 1. ISOLATED SOCKET SYNC: Updates here only re-render THIS section
+  // 1. ISOLATED SOCKET SYNC: single listener per sport; deps only [sportKey] so we don't re-register on every data/loading tick
   useEffect(() => {
-    let mounted = true;
+    const defaults =
+      sportKey === 'cricket' ? { tournament: 'Cricket' as const } : sportKey === 'tennis' ? { tournament: 'Tennis' as const } : { tournament: 'Football' as const }
+
+    let mounted = true
+    const PENDING_TICK_MS = 320
     const interval = setInterval(() => {
-      if (!mounted) return;
-
-      let changed = false;
-      if (pendingRawRef.current) {
-        const defaults = sportKey === 'cricket' ? { tournament: 'Cricket' as const } : sportKey === 'tennis' ? { tournament: 'Tennis' as const } : { tournament: 'Football' as const };
-        const mapped = mapMatchDataRowsToTopMatches(pendingRawRef.current, defaults);
-        localRef.current = mapped;
-        pendingRawRef.current = null;
-        changed = true;
-      }
-
-      if (changed || localRef.current !== data) {
-        setData(localRef.current);
-      }
-    }, 1200);
+      if (!mounted || !pendingRawRef.current) return
+      const raw = pendingRawRef.current
+      pendingRawRef.current = null
+      const mapped = mapMatchDataRowsToTopMatches(raw, defaults)
+      localRef.current = mapped
+      setData(mapped)
+    }, PENDING_TICK_MS)
 
     const remove = addMatchDataListener((kind, payload) => {
-      if (kind === 'error') return;
-      const { sportName, matches } = normalizeMatchDataUpdatePayload(payload);
-      const key = sportName === 'football' ? 'soccer' : sportName;
-      if (key !== sportKey || !Array.isArray(matches) || matches.length === 0) return;
+      if (kind === 'error') return
+      const { sportName, matches } = normalizeMatchDataUpdatePayload(payload)
+      const key = sportName === 'football' ? 'soccer' : sportName
+      if (key !== sportKey || !Array.isArray(matches) || matches.length === 0) return
 
-      pendingRawRef.current = matches;
-      if (loading) {
-        setLoading(false);
-        const defaults = sportKey === 'cricket' ? { tournament: 'Cricket' as const } : sportKey === 'tennis' ? { tournament: 'Tennis' as const } : { tournament: 'Football' as const };
-        const mapped = mapMatchDataRowsToTopMatches(matches, defaults);
-        localRef.current = mapped;
-        setData(mapped);
+      pendingRawRef.current = matches
+      if (loadingRef.current) {
+        setLoading(false)
+        loadingRef.current = false
+        const mapped = mapMatchDataRowsToTopMatches(matches, defaults)
+        localRef.current = mapped
+        setData(mapped)
+        pendingRawRef.current = null
+        return
       }
-    });
+    })
 
     return () => {
-      mounted = false;
-      remove();
-      clearInterval(interval);
-    };
-  }, [sportKey, loading, data]);
+      mounted = false
+      remove()
+      clearInterval(interval)
+    }
+  }, [sportKey])
 
   // 2. ISOLATED REST PREFETCH
   useEffect(() => {
     const prefetch = async () => {
       try {
-        const res = await sportsbookService.getRawMatches(sportKey);
-        const raw = normalizeRestMatchesList(res);
-        const tourney = sportKey === 'cricket' ? 'Cricket' : sportKey === 'tennis' ? 'Tennis' : 'Football';
-        const mapped = mapSocketRowsToTopMatches(raw, tourney);
+        const res = await sportsbookService.getRawMatches(sportKey)
+        const raw = normalizeRestMatchesList(res)
+        const tourney = sportKey === 'cricket' ? 'Cricket' : sportKey === 'tennis' ? 'Tennis' : 'Football'
+        const mapped = mapSocketRowsToTopMatches(raw, tourney)
         if (mapped.length > 0) {
-          localRef.current = mapped;
-          setData(mapped);
-          setLoading(false);
+          localRef.current = mapped
+          setData(mapped)
+          setLoading(false)
+          loadingRef.current = false
         }
-      } catch (e) { console.warn(`[MatchSection][${sportKey}] REST Prefetch failed`, e); }
-    };
-    prefetch();
-  }, [sportKey]);
+      } catch (e) { console.warn(`[MatchSection][${sportKey}] REST Prefetch failed`, e) }
+    }
+    prefetch()
+  }, [sportKey])
 
   const winW = useMemo(() => Dimensions.get('window').width, []);
   const leftClusterW = useMemo(() => Math.min(270, Math.round(winW * 0.58)), [winW]);
@@ -944,9 +944,21 @@ export const LandingPage = ({ onOpenLogin, onOpenSignup, onOpenHome, navigation:
     if (landingGames.crashGames.length > 0) return landingGames.crashGames
     return mergeDedupeGames(spbCrashGames, allCrashTypeGames)
   }, [landingGames.crashGames, spbCrashGames, allCrashTypeGames])
+  const matchDataSubscribeRef = useRef(0)
+  const matchDataUnsubRef = useRef(0)
+
   useEffect(() => {
+    matchDataSubscribeRef.current += 1
+    console.log('[LandingPage] subscribeMatchDataLandingAll', { call: matchDataSubscribeRef.current })
     subscribeMatchDataLandingAll()
-    return () => { unsubscribeMatchDataLandingAll() }
+    return () => {
+      matchDataUnsubRef.current += 1
+      console.log('[LandingPage] unsubscribeMatchDataLandingAll', {
+        from: 'effect#1',
+        call: matchDataUnsubRef.current,
+      })
+      unsubscribeMatchDataLandingAll()
+    }
   }, [])
 
   useEffect(() => {
@@ -986,7 +998,16 @@ export const LandingPage = ({ onOpenLogin, onOpenSignup, onOpenHome, navigation:
       }
     });
 
-    return () => { mounted = false; unsubscribeMatchDataLandingAll(); stopMatchesLoading(); }
+    return () => {
+      mounted = false
+      matchDataUnsubRef.current += 1
+      console.log('[LandingPage] unsubscribeMatchDataLandingAll', {
+        from: 'effect#2-games+listener',
+        call: matchDataUnsubRef.current,
+      })
+      unsubscribeMatchDataLandingAll()
+      stopMatchesLoading()
+    }
   }, [])
 
   const [heroIndex, setHeroIndex] = useState(0)

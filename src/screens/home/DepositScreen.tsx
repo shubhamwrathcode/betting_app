@@ -42,6 +42,74 @@ const makeQrUrl = (value: string) =>
 
 const cleanAmount = (v: string) => v.replace(/[^\d]/g, '')
 
+/** Wallet deposit APIs may return { message, success } or { data: { message, success } }. Toast `text1` must be a string, not an object. */
+function apiWalletMessage(res: AnyObj | null | undefined, fallback: string): string {
+  if (res == null) return fallback
+  const asStr = (v: unknown): string | null => {
+    if (v == null) return null
+    if (typeof v === 'string' && v.trim()) return v.trim()
+    if (typeof v === 'number' || typeof v === 'boolean') return String(v)
+    return null
+  }
+  const fromTop = asStr(res.message)
+  if (fromTop) return fromTop
+  const d = res.data
+  if (d != null && typeof d === 'object' && !Array.isArray(d)) {
+    const inner = asStr((d as AnyObj).message)
+    if (inner) return inner
+  }
+  if (typeof d === 'string' && d.trim()) return d.trim()
+  return fallback
+}
+
+function apiWalletSuccess(res: AnyObj | null | undefined): boolean {
+  if (res?.success === true) return true
+  const d = res?.data
+  if (d != null && typeof d === 'object' && !Array.isArray(d) && (d as AnyObj).success === true) return true
+  return false
+}
+
+function extractApiErrorMessage(e: any, fallback: string): string {
+  const asStr = (v: unknown): string | null => {
+    if (v == null) return null
+    if (typeof v === 'string' && v.trim()) return v.trim()
+    if (typeof v === 'number' || typeof v === 'boolean') return String(v)
+    return null
+  }
+
+  const direct =
+    asStr(e?.response?.data?.message) ||
+    asStr(e?.data?.message) ||
+    asStr(e?.message) ||
+    asStr(e?.error) ||
+    asStr(e)
+
+  if (!direct) return fallback
+
+  // Common thrown shape: "API request failed: 400  - {\"success\":false,\"message\":\"...\"}"
+  const idx = direct.indexOf(' - ')
+  if (idx !== -1) {
+    const tail = direct.slice(idx + 3).trim()
+    if (tail.startsWith('{') || tail.startsWith('[')) {
+      try {
+        const parsed = JSON.parse(tail)
+        const parsedMsg = asStr(parsed?.message) || asStr(parsed?.data?.message)
+        if (parsedMsg) return parsedMsg
+      } catch {
+        // ignore JSON parse errors; fall back below
+      }
+    }
+  }
+
+  // If message contains a stack or "Error:" prefix, keep it tidy.
+  const cleaned = direct
+    .replace(/\s*\n[\s\S]*$/m, '') // keep first line only
+    .replace(/^Error:\s*/i, '')
+    .trim()
+
+  return cleaned || fallback
+}
+
 const DepositScreen = () => {
   const navigation = useNavigation<any>()
   const route = useRoute<RouteProp<{ Deposit: DepositRouteParams }, 'Deposit'>>()
@@ -247,15 +315,24 @@ const DepositScreen = () => {
     if (amount < minAllowed) return Toast.show({ type: 'error', text1: `Minimum deposit amount is ₹${minAllowed}` })
     if (amount > maxAllowed) return Toast.show({ type: 'error', text1: `Maximum deposit amount is ₹${maxAllowed.toLocaleString('en-IN')}` })
     if (selectedPayment !== 'crypto' && utr.length < MIN_UTR_LENGTH) return Toast.show({ type: 'error', text1: 'Please enter UTR / Reference ID (at least 6 characters)' })
+    if (selectedPayment !== 'crypto' && !paymentProofFile) return Toast.show({ type: 'error', text1: 'Please upload payment proof screenshot' })
 
     if (selectedPayment === 'crypto') {
       setSubmitLoading(true)
       try {
         const result = await apiClient<any>(API_ENDPOINTS.walletVerifyUsdtDeposit, { method: 'GET' })
-        if (result?.success) Toast.show({ type: 'success', text1: result?.message || 'USDT deposit verification completed' })
-        else Toast.show({ type: 'error', text1: result?.message || 'Failed to verify USDT deposit' })
+        if (__DEV__) {
+          console.log('[DepositScreen] walletVerifyUsdtDeposit raw response', result)
+        }
+        if (apiWalletSuccess(result)) {
+          Toast.show({ type: 'success', text1: apiWalletMessage(result, 'USDT deposit verification completed') })
+        } else {
+          Toast.show({ type: 'error', text1: apiWalletMessage(result, 'Failed to verify USDT deposit') })
+        }
       } catch (e: any) {
-        Toast.show({ type: 'error', text1: e?.message || 'Failed to verify USDT deposit' })
+        if (__DEV__) console.log('[DepositScreen] walletVerifyUsdtDeposit error', e)
+        const msg = extractApiErrorMessage(e, 'Failed to verify USDT deposit')
+        Toast.show({ type: 'error', text1: msg })
       } finally {
         setSubmitLoading(false)
       }
@@ -283,8 +360,11 @@ const DepositScreen = () => {
       } else {
         result = await apiClient<any>(API_ENDPOINTS.walletDeposit, { method: 'POST', body: payload })
       }
-      if (result?.success) {
-        Toast.show({ type: 'success', text1: result?.message || 'Deposit request submitted successfully' })
+      if (__DEV__) {
+        console.log('[DepositScreen] walletDeposit raw response', { withProof: !!paymentProofFile, result })
+      }
+      if (apiWalletSuccess(result)) {
+        Toast.show({ type: 'success', text1: apiWalletMessage(result, 'Deposit request submitted successfully') })
         setAmountInput('')
         setSelectedAmount(null)
         setUtrInput('')
@@ -292,10 +372,12 @@ const DepositScreen = () => {
         setSelectedFileName('')
         setStep(1)
       } else {
-        Toast.show({ type: 'error', text1: result?.message || 'Failed to submit deposit request' })
+        Toast.show({ type: 'error', text1: apiWalletMessage(result, 'Failed to submit deposit request') })
       }
     } catch (e: any) {
-      Toast.show({ type: 'error', text1: e?.message || 'Failed to submit deposit request' })
+      if (__DEV__) console.log('[DepositScreen] walletDeposit error', e)
+      const msg = extractApiErrorMessage(e, 'Failed to submit deposit request')
+      Toast.show({ type: 'error', text1: msg })
     } finally {
       setSubmitLoading(false)
     }
@@ -526,10 +608,10 @@ const DepositScreen = () => {
                     </View>
 
                     <View style={styles.block}>
-                      <Text style={styles.blockTitle}>Screenshot (payment proof)</Text>
+                      <Text style={styles.blockTitle}>Screenshot (payment proof) *</Text>
                       <Pressable style={styles.uploadBox} onPress={() => setUploadSourceOpen(true)}>
                         <Text style={styles.uploadIcon}>⇪</Text>
-                        <Text style={styles.uploadText}>{selectedFileName || 'Choose screenshot (optional)'}</Text>
+                        <Text style={styles.uploadText}>{selectedFileName || 'Choose screenshot (required)'}</Text>
                       </Pressable>
                     </View>
                   </>

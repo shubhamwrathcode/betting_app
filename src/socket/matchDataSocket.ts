@@ -26,6 +26,11 @@ type MatchDataListener = (kind: 'update' | 'error', payload: unknown) => void
 
 const listeners = new Set<MatchDataListener>()
 let socket: Socket | null = null
+/** Debug: how many times the client entered the `connect` handler (each successful session). */
+let matchDataConnectCount = 0
+/** Debug: how many `disconnect` events from the server/engine. */
+let matchDataDisconnectCount = 0
+let matchDataLifecycleHooksInstalled = false
 const sportRefCounts = new Map<string, number>()
 const matchDetailSubRefCounts = new Map<string, number>()
 const matchDetailListeners = new Set<(payload: unknown) => void>()
@@ -96,6 +101,14 @@ function onError(payload: unknown) {
 
 function onConnect() {
   if (!socket) return
+  matchDataConnectCount += 1
+  const eng = (socket as any).io?.engine
+  const transport = typeof eng?.transport?.name === 'string' ? eng.transport.name : undefined
+  console.log(`[matchDataSocket] CONNECT #${matchDataConnectCount}`, {
+    socketId: socket.id,
+    transport,
+    ns: NAMESPACE_SUFFIX,
+  })
   if (landingAllActive) {
     socket.emit('matchData:subscribeAll')
     emitMatchDetailResubscribe()
@@ -105,6 +118,37 @@ function onConnect() {
     if (count > 0) socket.emit('matchData:subscribe', { sportName })
   }
   emitMatchDetailResubscribe()
+}
+
+function installMatchDataSocketDebugHooks(s: Socket) {
+  if (matchDataLifecycleHooksInstalled) return
+  matchDataLifecycleHooksInstalled = true
+  s.on('disconnect', (reason: string) => {
+    matchDataDisconnectCount += 1
+    console.log(`[matchDataSocket] DISCONNECT #${matchDataDisconnectCount}`, {
+      reason,
+      connectsSoFar: matchDataConnectCount,
+      socketId: s.id,
+      ns: NAMESPACE_SUFFIX,
+    })
+  })
+  s.on('connect_error', (err: Error) => {
+    const message = err && typeof (err as any).message === 'string' ? (err as any).message : String(err)
+    console.log('[matchDataSocket] connect_error', { message, ns: NAMESPACE_SUFFIX })
+  })
+  const mgr = s.io
+  if (mgr) {
+    mgr.on('reconnect_attempt', (n: number) => {
+      console.log('[matchDataSocket] reconnect_attempt', { n, ns: NAMESPACE_SUFFIX })
+    })
+    mgr.on('reconnect', (n: number) => {
+      console.log('[matchDataSocket] after reconnect (manager)', { n, ns: NAMESPACE_SUFFIX })
+    })
+    mgr.on('reconnect_error', (err: Error) => {
+      const message = err && typeof (err as any).message === 'string' ? (err as any).message : String(err)
+      console.log('[matchDataSocket] reconnect_error', { message, ns: NAMESPACE_SUFFIX })
+    })
+  }
 }
 
 function attachHandlers() {
@@ -128,12 +172,14 @@ function ensureSocket(): Socket {
   const apiBase = getMatchDataSocketOrigin()
   socket = io(`${apiBase}${NAMESPACE_SUFFIX}`, {
     path: '/socket.io',
-    transports: ['polling', 'websocket'],
+    // Prefer WebSocket first so first matchdata usually arrives faster than long-poll → upgrade.
+    transports: ['websocket', 'polling'],
     upgrade: true,
     autoConnect: true,
     reconnection: true,
     timeout: 20000,
   })
+  installMatchDataSocketDebugHooks(socket)
   attachHandlers()
   return socket
 }
